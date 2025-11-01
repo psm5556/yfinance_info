@@ -9,47 +9,90 @@ st.title("📡 Finance Data API (for Google Sheets)")
 ticker = st.query_params.get("ticker", "")
 field = st.query_params.get("field", "")
 
+import yfinance as yf
+import pandas as pd
+
 def get_data(ticker, field):
     t = yf.Ticker(ticker)
 
-    # 1️⃣ 기본정보
+    # 기본 정보 안전 조회
     try:
         info = t.get_info()
     except Exception:
-        info = t.fast_info
+        info = getattr(t, "fast_info", {})
 
-    # 2️⃣ price
+    # ------------------------------
+    # ① 가격 (price)
+    # ------------------------------
     if field == "price":
-        df = t.history(period="1d")
-        return df["Close"].iloc[-1]
+        try:
+            df = t.history(period="1d")
+            return float(df["Close"].iloc[-1])
+        except Exception:
+            return "N/A"
 
-    # 3️⃣ debtToEquity 계산
+    # ------------------------------
+    # ② 부채비율 (Debt to Equity)
+    # ------------------------------
     if field == "debtToEquity":
-        bs = t.balance_sheet
-        if 'Total Debt' in bs.index and 'Total Stockholder Equity' in bs.index:
-            debt = bs.loc['Total Debt'].iloc[0]
-            equity = bs.loc['Total Stockholder Equity'].iloc[0]
-            return round(debt / equity, 2)
-        else:
+        try:
+            bs = t.balance_sheet
+            if bs is None or bs.empty:
+                return "N/A"
+
+            # 대표 컬럼 (가장 최근 연도)
+            latest_col = bs.columns[0]
+
+            # 다양한 항목명 케이스 대응
+            debt_candidates = ["Total Debt", "Long Term Debt", "Total Liabilities"]
+            equity_candidates = ["Total Stockholder Equity", "Total Shareholder Equity", "Stockholders Equity"]
+
+            debt = next((bs.loc[name, latest_col] for name in debt_candidates if name in bs.index), None)
+            equity = next((bs.loc[name, latest_col] for name in equity_candidates if name in bs.index), None)
+
+            if debt and equity and equity != 0:
+                return round(float(debt) / float(equity), 2)
+            else:
+                return "N/A"
+        except Exception:
             return "N/A"
 
-    # 4️⃣ currentRatio 계산
+    # ------------------------------
+    # ③ 유동비율 (Current Ratio)
+    # ------------------------------
     if field == "currentRatio":
-        bs = t.balance_sheet
-        if 'Total Current Assets' in bs.index and 'Total Current Liabilities' in bs.index:
-            ca = bs.loc['Total Current Assets'].iloc[0]
-            cl = bs.loc['Total Current Liabilities'].iloc[0]
-            return round(ca / cl, 2)
-        else:
+        try:
+            bs = t.balance_sheet
+            if bs is None or bs.empty:
+                return "N/A"
+
+            latest_col = bs.columns[0]
+            ca_candidates = ["Total Current Assets", "Current Assets"]
+            cl_candidates = ["Total Current Liabilities", "Current Liabilities"]
+
+            ca = next((bs.loc[name, latest_col] for name in ca_candidates if name in bs.index), None)
+            cl = next((bs.loc[name, latest_col] for name in cl_candidates if name in bs.index), None)
+
+            if ca and cl and cl != 0:
+                return round(float(ca) / float(cl), 2)
+            else:
+                return "N/A"
+        except Exception:
             return "N/A"
 
-    # 5️⃣ 그 외 항목
-    if field in info:
-        return info[field]
-    elif hasattr(t, "fast_info") and field in t.fast_info:
-        return t.fast_info[field]
+    # ------------------------------
+    # ④ 기본 info / fast_info 항목
+    # ------------------------------
+    try:
+        if field in info:
+            return info[field]
+        elif hasattr(t, "fast_info") and field in t.fast_info:
+            return t.fast_info[field]
+        else:
+            return "N/A"
+    except Exception:
+        return "N/A"
 
-    return f"Field '{field}' not found"
 
 
 
