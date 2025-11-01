@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import time
+import requests
 
 st.set_page_config(page_title="Finance API")
 st.title("📡 Finance Data API (for Google Sheets)")
@@ -10,91 +11,103 @@ ticker = st.query_params.get("ticker", "")
 field = st.query_params.get("field", "")
 debug = st.query_params.get("debug", "")
 
-def get_ticker_with_retry(ticker_symbol, max_retries=3, show_debug=False):
-    """재시도 로직이 있는 Ticker 객체 생성"""
-    for attempt in range(max_retries):
-        try:
-            if show_debug and attempt > 0:
-                st.info(f"Retry attempt {attempt + 1}/{max_retries}")
-            
-            t = yf.Ticker(ticker_symbol)
-            
-            # 데이터가 실제로 로드되는지 테스트
-            _ = t.history(period="1d")
-            
-            return t
-        except Exception as e:
-            if show_debug:
-                st.warning(f"Attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)  # 지수 백오프
-            else:
-                if show_debug:
-                    st.error(f"All {max_retries} attempts failed")
-                return None
-    return None
-
 @st.cache_data(ttl=3600)
 def get_all_financial_data(ticker_symbol):
-    """모든 재무 데이터를 한 번에 가져오기"""
+    """여러 방법으로 데이터 가져오기"""
     result = {
         'balance_sheet': None,
         'quarterly_balance_sheet': None,
-        'financials': None,
         'info': {},
         'price': None,
-        'history': None
     }
     
     try:
-        # 세션 설정으로 더 안정적인 요청
-        t = yf.Ticker(ticker_symbol)
+        # 방법 1: User-Agent 헤더 추가하여 yfinance 사용
+        import yfinance as yf
         
-        # 1. 가격 정보 (가장 안정적)
+        # Ticker 객체 생성 시 세션 설정
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        })
+        
+        t = yf.Ticker(ticker_symbol, session=session)
+        
+        # 1. 가격 - download 함수 사용 (더 안정적)
         try:
-            hist = t.history(period="5d")
-            if not hist.empty:
-                result['history'] = hist
-                result['price'] = float(hist['Close'].iloc[-1])
+            df = yf.download(ticker_symbol, period="1d", progress=False, session=session)
+            if not df.empty:
+                result['price'] = float(df['Close'].iloc[-1])
         except Exception as e:
             pass
         
         # 2. 재무제표
         try:
-            bs = t.balance_sheet
+            # get_balance_sheet() 메서드 사용
+            bs = t.get_balance_sheet(freq='yearly')
             if bs is not None and not bs.empty:
                 result['balance_sheet'] = bs
         except Exception:
-            pass
+            try:
+                # 속성으로 접근
+                bs = t.balance_sheet
+                if bs is not None and not bs.empty:
+                    result['balance_sheet'] = bs
+            except Exception:
+                pass
         
         try:
-            qbs = t.quarterly_balance_sheet
-            if qbs is not None and not qbs.empty:
-                result['quarterly_balance_sheet'] = qbs
+            bs = t.get_balance_sheet(freq='quarterly')
+            if bs is not None and not bs.empty:
+                result['quarterly_balance_sheet'] = bs
         except Exception:
-            pass
+            try:
+                bs = t.quarterly_balance_sheet
+                if bs is not None and not bs.empty:
+                    result['quarterly_balance_sheet'] = bs
+            except Exception:
+                pass
         
+        # 3. Info - 여러 방법 시도
         try:
-            fin = t.financials
-            if fin is not None and not fin.empty:
-                result['financials'] = fin
-        except Exception:
-            pass
-        
-        # 3. Info (가장 불안정)
-        try:
-            info = t.info
+            # get_info() 메서드
+            info = t.get_info()
             if info and len(info) > 0:
                 result['info'] = info
         except Exception:
-            # info 실패 시 기본 정보만 가져오기
             try:
-                result['info'] = {
-                    'symbol': ticker_symbol,
-                    'shortName': t.info.get('shortName', ticker_symbol) if hasattr(t, 'info') else ticker_symbol
-                }
-            except:
-                result['info'] = {'symbol': ticker_symbol}
+                # info 속성
+                info = t.info
+                if info and len(info) > 0:
+                    result['info'] = info
+            except Exception:
+                try:
+                    # basic_info 시도
+                    if hasattr(t, 'basic_info'):
+                        info = t.basic_info
+                        if info:
+                            result['info'] = info
+                except Exception:
+                    pass
+        
+        # 4. fast_info 시도 (최신 yfinance)
+        if not result['price']:
+            try:
+                if hasattr(t, 'fast_info'):
+                    fast = t.fast_info
+                    if hasattr(fast, 'last_price') and fast.last_price:
+                        result['price'] = float(fast.last_price)
+            except Exception:
+                pass
+        
+        # 5. history로 가격 재시도
+        if not result['price']:
+            try:
+                hist = t.history(period="1d")
+                if not hist.empty:
+                    result['price'] = float(hist['Close'].iloc[-1])
+            except Exception:
+                pass
         
         return result
         
@@ -105,16 +118,22 @@ def get_data(ticker, field, show_debug=False):
     try:
         if show_debug:
             st.write(f"**Fetching data for {ticker}...**")
+            st.write(f"yfinance version: {yf.__version__}")
         
-        # 모든 데이터 한 번에 가져오기
+        # 모든 데이터 가져오기
         data = get_all_financial_data(ticker)
         
         if show_debug:
             st.write("**Data retrieval status:**")
-            st.write(f"- Price: {'✓' if data['price'] else '✗'}")
-            st.write(f"- Balance Sheet: {'✓' if data['balance_sheet'] is not None else '✗'}")
-            st.write(f"- Quarterly BS: {'✓' if data['quarterly_balance_sheet'] is not None else '✗'}")
-            st.write(f"- Info: {'✓' if len(data['info']) > 1 else '✗'}")
+            st.write(f"- Price: {'✓ ' + str(data['price']) if data['price'] else '✗'}")
+            st.write(f"- Balance Sheet: {'✓ (shape: ' + str(data['balance_sheet'].shape) + ')' if data['balance_sheet'] is not None else '✗'}")
+            st.write(f"- Quarterly BS: {'✓ (shape: ' + str(data['quarterly_balance_sheet'].shape) + ')' if data['quarterly_balance_sheet'] is not None else '✗'}")
+            st.write(f"- Info keys: {len(data['info'])}")
+            
+            if data['info']:
+                st.write("**Info sample:**")
+                sample = dict(list(data['info'].items())[:10])
+                st.json(sample)
         
         # ------------------------------
         # ① 가격 (price)
@@ -132,39 +151,41 @@ def get_data(ticker, field, show_debug=False):
         # ------------------------------
         if field == "debtToEquity":
             try:
-                # 재무제표 우선
+                # 재무제표에서 계산
                 bs = data['balance_sheet'] if data['balance_sheet'] is not None else data['quarterly_balance_sheet']
                 
                 if bs is not None and not bs.empty:
                     if show_debug:
                         st.write("**✓ Balance Sheet Available**")
-                        st.write(f"Shape: {bs.shape}")
-                        st.write("**All items:**")
+                        st.write(f"Columns: {bs.columns.tolist()}")
+                        st.write(f"Index ({len(bs.index)} items):")
                         st.write(bs.index.tolist())
-                        st.write("**Sample data:**")
-                        st.dataframe(bs.iloc[:10, :1])
+                        st.write("**Full balance sheet:**")
+                        st.dataframe(bs)
                     
                     latest_col = bs.columns[0]
                     
-                    # 부채 항목 모두 시도
+                    # 부채 찾기 - 문자열 검색
                     debt = None
-                    debt_items = bs.index[bs.index.str.contains('debt', case=False, na=False)].tolist()
+                    debt_items = [idx for idx in bs.index if 'debt' in str(idx).lower()]
                     
                     if show_debug:
-                        st.write(f"**Found debt-related items:** {debt_items}")
+                        st.write(f"**Debt-related items:** {debt_items}")
+                        if debt_items:
+                            for item in debt_items:
+                                st.write(f"  - {item}: {bs.loc[item, latest_col]}")
                     
-                    # 우선순위대로 검색
+                    # Total Debt 우선
                     for item in debt_items:
-                        val = bs.loc[item, latest_col]
-                        if pd.notna(val) and val != 0:
-                            # "Total Debt" 같은 항목 우선
-                            if 'total' in item.lower():
+                        if 'total' in str(item).lower():
+                            val = bs.loc[item, latest_col]
+                            if pd.notna(val) and val != 0:
                                 debt = float(val)
                                 if show_debug:
-                                    st.success(f"✓ Debt: {item} = {debt:,.0f}")
+                                    st.success(f"✓ Using: {item} = {debt:,.0f}")
                                 break
                     
-                    # 찾지 못했으면 아무 debt 항목이나
+                    # 없으면 첫 번째 debt 항목
                     if debt is None and debt_items:
                         val = bs.loc[debt_items[0], latest_col]
                         if pd.notna(val):
@@ -172,58 +193,69 @@ def get_data(ticker, field, show_debug=False):
                             if show_debug:
                                 st.info(f"Using: {debt_items[0]} = {debt:,.0f}")
                     
-                    # 자본 항목
+                    # 자본 찾기
                     equity = None
-                    equity_items = bs.index[bs.index.str.contains('equity|stockholder', case=False, na=False)].tolist()
+                    equity_items = [idx for idx in bs.index if 'equity' in str(idx).lower() or 'stockholder' in str(idx).lower()]
                     
                     if show_debug:
-                        st.write(f"**Found equity-related items:** {equity_items}")
+                        st.write(f"**Equity-related items:** {equity_items}")
+                        if equity_items:
+                            for item in equity_items:
+                                st.write(f"  - {item}: {bs.loc[item, latest_col]}")
                     
                     for item in equity_items:
                         val = bs.loc[item, latest_col]
                         if pd.notna(val) and val != 0:
-                            if 'stockholder' in item.lower() or 'equity' in item.lower():
-                                equity = float(val)
-                                if show_debug:
-                                    st.success(f"✓ Equity: {item} = {equity:,.0f}")
-                                break
-                    
-                    if equity is None and equity_items:
-                        val = bs.loc[equity_items[0], latest_col]
-                        if pd.notna(val):
                             equity = float(val)
                             if show_debug:
-                                st.info(f"Using: {equity_items[0]} = {equity:,.0f}")
+                                st.success(f"✓ Using: {item} = {equity:,.0f}")
+                            break
                     
                     if debt is not None and equity is not None and equity != 0:
                         ratio = round(debt / equity, 2)
                         if show_debug:
-                            st.success(f"✓✓ D/E Ratio: {ratio}")
+                            st.success(f"✅ D/E Ratio: {debt:,.0f} / {equity:,.0f} = {ratio}")
                         return ratio
                     else:
                         if show_debug:
-                            st.warning(f"Missing: debt={debt}, equity={equity}")
+                            st.warning(f"Incomplete data: debt={debt}, equity={equity}")
+                else:
+                    if show_debug:
+                        st.error("Balance sheet is empty")
                 
                 # info에서 시도
                 info = data['info']
-                if info and len(info) > 1:
+                if info:
                     if show_debug:
-                        st.write("**Checking info...**")
+                        st.write("**Checking info dictionary...**")
                         relevant = {k: v for k, v in info.items() if 'debt' in k.lower() or 'equity' in k.lower()}
-                        st.json(relevant)
+                        if relevant:
+                            st.json(relevant)
+                        else:
+                            st.write("No debt/equity keys in info")
                     
                     if 'debtToEquity' in info and info['debtToEquity']:
                         val = float(info['debtToEquity'])
-                        return round(val / 100, 2) if val > 100 else round(val, 2)
+                        result = round(val / 100, 2) if val > 100 else round(val, 2)
+                        if show_debug:
+                            st.success(f"✓ From info['debtToEquity']: {result}")
+                        return result
                     
                     total_debt = info.get('totalDebt') or info.get('longTermDebt')
-                    equity = info.get('totalStockholderEquity')
+                    equity = info.get('totalStockholderEquity') or info.get('stockholdersEquity')
+                    
+                    if show_debug:
+                        st.write(f"totalDebt: {total_debt}")
+                        st.write(f"stockholderEquity: {equity}")
                     
                     if total_debt and equity and equity != 0:
-                        return round(float(total_debt) / float(equity), 2)
+                        result = round(float(total_debt) / float(equity), 2)
+                        if show_debug:
+                            st.success(f"✓ Calculated from info: {result}")
+                        return result
                 
                 if show_debug:
-                    st.error("❌ Could not calculate D/E ratio")
+                    st.error("❌ Could not calculate D/E ratio from any source")
                 return "N/A"
                 
             except Exception as e:
@@ -243,8 +275,8 @@ def get_data(ticker, field, show_debug=False):
                 if bs is not None:
                     latest_col = bs.columns[0]
                     
-                    ca_items = bs.index[bs.index.str.contains('current asset', case=False, na=False)].tolist()
-                    cl_items = bs.index[bs.index.str.contains('current liab', case=False, na=False)].tolist()
+                    ca_items = [idx for idx in bs.index if 'current asset' in str(idx).lower()]
+                    cl_items = [idx for idx in bs.index if 'current liab' in str(idx).lower()]
                     
                     ca = None
                     cl = None
@@ -278,7 +310,7 @@ def get_data(ticker, field, show_debug=False):
         if show_debug:
             st.write(f"**Info keys ({len(info)}):**")
             if len(info) > 0:
-                st.write(list(info.keys())[:30])
+                st.write(list(info.keys())[:50])
         
         if info and field in info and info[field] is not None:
             return info[field]
@@ -288,6 +320,8 @@ def get_data(ticker, field, show_debug=False):
     except Exception as e:
         if show_debug:
             st.error(f"General error: {e}")
+            import traceback
+            st.code(traceback.format_exc())
         return "N/A"
 
 
@@ -296,14 +330,20 @@ if ticker and field:
     result = get_data(ticker, field, show_debug)
     st.json({"ticker": ticker, "field": field, "value": result})
 else:
+    st.write("**📌 Finance Data API for Google Sheets**")
+    st.write("")
     st.write("**사용법:**")
     st.code("?ticker=AAPL&field=price")
+    st.code("?ticker=AAPL&field=debtToEquity")
+    st.code("?ticker=MSFT&field=marketCap")
+    st.write("")
+    st.write("**디버그 모드:**")
     st.code("?ticker=AAPL&field=debtToEquity&debug=true")
     st.write("")
     st.write("**지원 필드:**")
     st.write("- `price`: 현재 주가")
     st.write("- `debtToEquity`: 부채비율")
     st.write("- `currentRatio`: 유동비율")
-    st.write("- 기타 yfinance info 필드")
+    st.write("- `marketCap`, `trailingPE`, `profitMargins` 등")
     st.write("")
-    st.info("💡 데이터 로딩이 실패하면 debug=true를 추가하여 원인을 확인하세요")
+    st.info("💡 yfinance는 Yahoo Finance API를 사용하므로 일시적으로 데이터를 가져오지 못할 수 있습니다.")
