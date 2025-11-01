@@ -25,4 +25,4 @@ if ticker and field:
     result = get_data(ticker, field)
     st.json({"ticker": ticker, "field": field, "value": result})
 else:
-    st.write("Use as: https://your-app.streamlit.app/?ticker=AAPL&field=debtToEquity")
+    st.write("Use as: https://yfinanceinfo-n9gbqx6wbjrerkqvucghhl.streamlit.app/?ticker=AAPL&field=debtToEquity")
