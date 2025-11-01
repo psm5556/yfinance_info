@@ -11,15 +11,27 @@ field = st.query_params.get("field", "")
 
 def get_data(ticker, field):
     t = yf.Ticker(ticker)
-    info = t.info
-    # 안전하게 key 체크
+
+    # 우선 안전하게 info 조회 시도
+    try:
+        info = t.get_info()
+    except Exception:
+        info = t.fast_info  # 빠르고 안정적
+    
+    if not info:
+        return "No data"
+
+    # 필드 처리
     if field in info:
         return info[field]
     elif field == "price":
         df = t.history(period="1d")
         return df["Close"].iloc[-1]
+    elif field in t.fast_info:
+        return t.fast_info[field]
     else:
         return f"Field '{field}' not found"
+
 
 if ticker and field:
     result = get_data(ticker, field)
