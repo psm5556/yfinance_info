@@ -11,148 +11,167 @@ field = st.query_params.get("field", "")
 debug = st.query_params.get("debug", "")
 
 @st.cache_data(ttl=3600)  # 1시간 캐시
-def get_ticker_data(ticker_symbol):
-    """티커 데이터를 캐시하여 반복 요청 방지"""
+def get_balance_sheet_data(ticker_symbol, quarterly=False):
+    """재무제표 데이터를 DataFrame으로 캐싱"""
     try:
         t = yf.Ticker(ticker_symbol)
-        return t
-    except Exception as e:
-        return None
-
-def safe_get_info(ticker_obj, show_debug=False):
-    """안전하게 info 가져오기"""
-    try:
-        return ticker_obj.info
-    except Exception as e1:
-        if show_debug:
-            st.warning(f"Failed to get info (attempt 1): {e1}")
-        try:
-            # 재시도
-            time.sleep(1)
-            return ticker_obj.info
-        except Exception as e2:
-            if show_debug:
-                st.error(f"Failed to get info (attempt 2): {e2}")
-            return {}
-
-def safe_get_balance_sheet(ticker_obj, quarterly=False, show_debug=False):
-    """안전하게 재무제표 가져오기"""
-    try:
         if quarterly:
-            bs = ticker_obj.quarterly_balance_sheet
+            bs = t.quarterly_balance_sheet
         else:
-            bs = ticker_obj.balance_sheet
+            bs = t.balance_sheet
         
         if bs is not None and not bs.empty:
             return bs
         return None
-    except Exception as e:
-        if show_debug:
-            st.warning(f"Failed to get balance sheet: {e}")
+    except Exception:
+        return None
+
+@st.cache_data(ttl=3600)  # 1시간 캐시
+def get_info_data(ticker_symbol):
+    """info 데이터를 dict로 캐싱"""
+    try:
+        t = yf.Ticker(ticker_symbol)
+        return t.info
+    except Exception:
+        return {}
+
+@st.cache_data(ttl=300)  # 5분 캐시 (가격은 자주 변경됨)
+def get_price_data(ticker_symbol):
+    """가격 데이터 캐싱"""
+    try:
+        t = yf.Ticker(ticker_symbol)
+        
+        # fast_info 시도
+        if hasattr(t, 'fast_info') and hasattr(t.fast_info, 'last_price'):
+            price = t.fast_info.last_price
+            if price and price > 0:
+                return float(price)
+        
+        # history 시도
+        df = t.history(period="1d")
+        if not df.empty:
+            return float(df["Close"].iloc[-1])
+        
+        return None
+    except Exception:
         return None
 
 def get_data(ticker, field, show_debug=False):
     try:
-        t = get_ticker_data(ticker)
-        if t is None:
-            return "N/A"
-        
         # ------------------------------
         # ① 가격 (price)
         # ------------------------------
         if field == "price":
-            try:
-                # fast_info 사용 (더 빠르고 안정적)
-                if hasattr(t, 'fast_info') and hasattr(t.fast_info, 'last_price'):
-                    price = t.fast_info.last_price
-                    if price and price > 0:
-                        return float(price)
-                
-                # history 사용
-                df = t.history(period="1d")
-                if not df.empty:
-                    return float(df["Close"].iloc[-1])
-                
-                return "N/A"
-            except Exception as e:
-                if show_debug:
-                    st.error(f"Price error: {e}")
-                return "N/A"
+            price = get_price_data(ticker)
+            if price is not None:
+                return price
+            
+            if show_debug:
+                st.error("Failed to get price data")
+            return "N/A"
         
         # ------------------------------
         # ② 부채비율 (Debt to Equity)
         # ------------------------------
         if field == "debtToEquity":
             try:
-                # 방법 1: 재무제표에서 직접 계산 (가장 신뢰성 높음)
-                bs = safe_get_balance_sheet(t, quarterly=False, show_debug=show_debug)
+                # 방법 1: 재무제표에서 계산
+                bs = get_balance_sheet_data(ticker, quarterly=False)
                 
                 if bs is None:
-                    # 분기 재무제표 시도
-                    bs = safe_get_balance_sheet(t, quarterly=True, show_debug=show_debug)
+                    bs = get_balance_sheet_data(ticker, quarterly=True)
                 
                 if bs is not None:
                     if show_debug:
                         st.write("**Balance Sheet Index:**")
                         st.write(bs.index.tolist())
+                        st.write("**First few rows:**")
+                        st.dataframe(bs.head())
                     
                     latest_col = bs.columns[0]
                     debt = None
                     equity = None
                     
-                    # 부채 찾기
-                    for debt_key in ["Total Debt", "TotalDebt", "Net Debt", "NetDebt"]:
+                    # 부채 찾기 - 더 많은 변형 추가
+                    debt_keys = [
+                        "Total Debt",
+                        "TotalDebt",
+                        "Net Debt",
+                        "NetDebt",
+                        "Long Term Debt",
+                        "LongTermDebt",
+                        "Total Liabilities Net Minority Interest",
+                        "TotalLiabilitiesNetMinorityInterest"
+                    ]
+                    
+                    for debt_key in debt_keys:
                         if debt_key in bs.index:
                             val = bs.loc[debt_key, latest_col]
-                            if pd.notna(val):
+                            if pd.notna(val) and val != 0:
                                 debt = float(val)
                                 if show_debug:
-                                    st.write(f"Found debt: {debt_key} = {debt}")
+                                    st.success(f"✓ Found debt: {debt_key} = {debt:,.0f}")
                                 break
                     
                     # 자본 찾기
-                    for equity_key in ["Stockholders Equity", "StockholdersEquity", 
-                                       "Total Equity Gross Minority Interest", 
-                                       "Common Stock Equity", "CommonStockEquity"]:
+                    equity_keys = [
+                        "Stockholders Equity",
+                        "StockholdersEquity",
+                        "Total Equity Gross Minority Interest",
+                        "TotalEquityGrossMinorityInterest",
+                        "Common Stock Equity",
+                        "CommonStockEquity",
+                        "Stockholder Equity",
+                        "StockholderEquity",
+                        "Ordinary Shares Number"
+                    ]
+                    
+                    for equity_key in equity_keys:
                         if equity_key in bs.index:
                             val = bs.loc[equity_key, latest_col]
-                            if pd.notna(val):
+                            if pd.notna(val) and val != 0:
                                 equity = float(val)
                                 if show_debug:
-                                    st.write(f"Found equity: {equity_key} = {equity}")
+                                    st.success(f"✓ Found equity: {equity_key} = {equity:,.0f}")
                                 break
                     
                     if debt is not None and equity is not None and equity != 0:
                         ratio = round(debt / equity, 2)
+                        if show_debug:
+                            st.success(f"✓ Calculated D/E Ratio: {ratio}")
                         return ratio
+                    else:
+                        if show_debug:
+                            st.warning(f"Missing data - Debt: {debt}, Equity: {equity}")
                 
                 # 방법 2: info에서 가져오기
-                info = safe_get_info(t, show_debug)
+                info = get_info_data(ticker)
+                
+                if info and show_debug:
+                    st.write("**Checking info...**")
+                    debt_equity_keys = [k for k in info.keys() if 'debt' in k.lower() or 'equity' in k.lower()]
+                    st.write(f"Debt/Equity related keys: {debt_equity_keys}")
                 
                 if info:
-                    if show_debug:
-                        st.write("**Checking info for debt/equity...**")
-                        relevant_keys = [k for k in info.keys() if 'debt' in k.lower() or 'equity' in k.lower()]
-                        st.write(f"Relevant keys: {relevant_keys}")
-                    
                     # debtToEquity 직접 확인
                     if 'debtToEquity' in info and info['debtToEquity']:
                         value = float(info['debtToEquity'])
-                        # 100 이상이면 퍼센트일 가능성
                         if value > 100:
                             return round(value / 100, 2)
                         return round(value, 2)
                     
                     # totalDebt와 stockholderEquity로 계산
-                    total_debt = info.get('totalDebt') or info.get('longTermDebt')
-                    equity = info.get('totalStockholderEquity') or info.get('stockholdersEquity')
+                    total_debt = info.get('totalDebt') or info.get('longTermDebt', 0)
+                    equity = info.get('totalStockholderEquity') or info.get('stockholdersEquity', 0)
                     
                     if show_debug:
-                        st.write(f"totalDebt: {total_debt}, stockholderEquity: {equity}")
+                        st.write(f"Info - totalDebt: {total_debt}, stockholderEquity: {equity}")
                     
                     if total_debt and equity and equity != 0:
                         return round(float(total_debt) / float(equity), 2)
                 
+                if show_debug:
+                    st.error("Could not calculate Debt to Equity ratio")
                 return "N/A"
                     
             except Exception as e:
@@ -167,11 +186,10 @@ def get_data(ticker, field, show_debug=False):
         # ------------------------------
         if field == "currentRatio":
             try:
-                # 재무제표에서 계산
-                bs = safe_get_balance_sheet(t, quarterly=False, show_debug=show_debug)
+                bs = get_balance_sheet_data(ticker, quarterly=False)
                 
                 if bs is None:
-                    bs = safe_get_balance_sheet(t, quarterly=True, show_debug=show_debug)
+                    bs = get_balance_sheet_data(ticker, quarterly=True)
                 
                 if bs is not None:
                     if show_debug:
@@ -182,28 +200,40 @@ def get_data(ticker, field, show_debug=False):
                     ca = None
                     cl = None
                     
-                    for ca_key in ["Current Assets", "CurrentAssets"]:
+                    ca_keys = ["Current Assets", "CurrentAssets", "Total Current Assets", "TotalCurrentAssets"]
+                    cl_keys = ["Current Liabilities", "CurrentLiabilities", "Total Current Liabilities", "TotalCurrentLiabilities"]
+                    
+                    for ca_key in ca_keys:
                         if ca_key in bs.index:
                             val = bs.loc[ca_key, latest_col]
                             if pd.notna(val):
                                 ca = float(val)
+                                if show_debug:
+                                    st.success(f"✓ Found current assets: {ca_key} = {ca:,.0f}")
                                 break
                     
-                    for cl_key in ["Current Liabilities", "CurrentLiabilities"]:
+                    for cl_key in cl_keys:
                         if cl_key in bs.index:
                             val = bs.loc[cl_key, latest_col]
                             if pd.notna(val):
                                 cl = float(val)
+                                if show_debug:
+                                    st.success(f"✓ Found current liabilities: {cl_key} = {cl:,.0f}")
                                 break
                     
                     if ca is not None and cl is not None and cl != 0:
-                        return round(ca / cl, 2)
+                        ratio = round(ca / cl, 2)
+                        if show_debug:
+                            st.success(f"✓ Calculated Current Ratio: {ratio}")
+                        return ratio
                 
                 # info에서 가져오기
-                info = safe_get_info(t, show_debug)
+                info = get_info_data(ticker)
                 if info and 'currentRatio' in info and info['currentRatio']:
                     return float(info['currentRatio'])
                 
+                if show_debug:
+                    st.error("Could not calculate Current Ratio")
                 return "N/A"
                     
             except Exception as e:
@@ -214,22 +244,18 @@ def get_data(ticker, field, show_debug=False):
         # ------------------------------
         # ④ 기본 info 항목
         # ------------------------------
-        try:
-            info = safe_get_info(t, show_debug)
-            
-            if show_debug and info:
-                st.write("**Available info keys (sample):**")
-                st.write(list(info.keys())[:30])
-            
-            if info and field in info and info[field] is not None:
-                return info[field]
-            
-            return "N/A"
-                
-        except Exception as e:
-            if show_debug:
-                st.error(f"Info field error: {e}")
-            return "N/A"
+        info = get_info_data(ticker)
+        
+        if show_debug and info:
+            st.write("**Available info keys (first 50):**")
+            st.write(list(info.keys())[:50])
+        
+        if info and field in info and info[field] is not None:
+            return info[field]
+        
+        if show_debug:
+            st.warning(f"Field '{field}' not found in info")
+        return "N/A"
             
     except Exception as e:
         if show_debug:
@@ -258,4 +284,5 @@ else:
     st.write("- `currentRatio`: 유동비율")
     st.write("- `marketCap`: 시가총액")
     st.write("- `trailingPE`: PER")
+    st.write("- `profitMargins`: 순이익률")
     st.write("- 기타 yfinance info 필드")
