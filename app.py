@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import pandas as pd
 from datetime import datetime
-import json
 
 st.set_page_config(page_title="Finance API")
 st.title("📡 Finance Data API (for Google Sheets)")
@@ -14,155 +13,211 @@ debug = st.query_params.get("debug", "")
 # API 키 가져오기
 API_KEY = None
 try:
-    API_KEY = st.secrets["ALPHA_VANTAGE_API_KEY"]
-except Exception as e:
-    # 로컬 테스트용 - 환경변수에서도 시도
+    API_KEY = st.secrets["FMP_API_KEY"]
+except Exception:
     import os
-    API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY")
+    API_KEY = os.environ.get("FMP_API_KEY")
 
 if not API_KEY and not ticker:
-    st.error("⚠️ Alpha Vantage API 키가 설정되지 않았습니다.")
+    st.error("⚠️ FMP API 키가 설정되지 않았습니다.")
     st.write("**설정 방법:**")
-    st.write("1. https://www.alphavantage.co/support/#api-key 에서 무료 API 키 발급")
-    st.write("2. Streamlit Cloud → Settings → Secrets에 다음 추가:")
-    st.code('ALPHA_VANTAGE_API_KEY = "your_api_key_here"', language="toml")
-    st.write("3. 로컬 개발 시: `.streamlit/secrets.toml` 파일 생성")
+    st.write("1. https://site.financialmodelingprep.com/developer/docs/ 에서 무료 가입")
+    st.write("2. API 키 발급 (무료: 250 requests/day)")
+    st.write("3. Streamlit Cloud → Settings → Secrets:")
+    st.code('FMP_API_KEY = "your_api_key_here"', language="toml")
+
+BASE_URL = "https://financialmodelingprep.com/api/v3"
 
 @st.cache_data(ttl=300)  # 5분 캐시
-def get_alpha_vantage_quote(symbol):
-    """실시간 가격 정보"""
+def fmp_get_quote(symbol):
+    """실시간 가격"""
     if not API_KEY:
-        return {"error": "NO_API_KEY", "message": "API key not configured"}
+        return {"error": "NO_API_KEY"}
     
-    url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={API_KEY}"
+    url = f"{BASE_URL}/quote/{symbol}?apikey={API_KEY}"
     
     try:
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
         
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
+        
         return data
-    except requests.exceptions.Timeout:
-        return {"error": "TIMEOUT", "message": "Request timeout"}
-    except requests.exceptions.RequestException as e:
-        return {"error": "REQUEST_ERROR", "message": str(e)}
-    except json.JSONDecodeError:
-        return {"error": "JSON_ERROR", "message": "Invalid JSON response"}
     except Exception as e:
-        return {"error": "UNKNOWN", "message": str(e)}
+        return {"error": str(e)}
 
 @st.cache_data(ttl=3600)  # 1시간 캐시
-def get_alpha_vantage_overview(symbol):
-    """회사 개요 데이터 (재무 지표 포함)"""
+def fmp_get_profile(symbol):
+    """회사 프로필 (기본 정보)"""
     if not API_KEY:
-        return {"error": "NO_API_KEY", "message": "API key not configured"}
+        return {"error": "NO_API_KEY"}
     
-    url = f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}&apikey={API_KEY}"
+    url = f"{BASE_URL}/profile/{symbol}?apikey={API_KEY}"
     
     try:
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
         
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
+        
         return data
     except Exception as e:
-        return {"error": "REQUEST_FAILED", "message": str(e)}
+        return {"error": str(e)}
 
 @st.cache_data(ttl=3600)
-def get_alpha_vantage_balance_sheet(symbol):
-    """재무상태표 (Balance Sheet)"""
+def fmp_get_balance_sheet(symbol):
+    """재무상태표"""
     if not API_KEY:
-        return {"error": "NO_API_KEY", "message": "API key not configured"}
+        return {"error": "NO_API_KEY"}
     
-    url = f"https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol={symbol}&apikey={API_KEY}"
+    url = f"{BASE_URL}/balance-sheet-statement/{symbol}?limit=1&apikey={API_KEY}"
     
     try:
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
         
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
+        
         return data
     except Exception as e:
-        return {"error": "REQUEST_FAILED", "message": str(e)}
+        return {"error": str(e)}
 
-def calculate_debt_to_equity(overview_data, balance_sheet_data, show_debug=False):
+@st.cache_data(ttl=3600)
+def fmp_get_financial_ratios(symbol):
+    """재무 비율 (P/E, D/E, Current Ratio 등)"""
+    if not API_KEY:
+        return {"error": "NO_API_KEY"}
+    
+    url = f"{BASE_URL}/ratios/{symbol}?limit=1&apikey={API_KEY}"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
+        
+        return data
+    except Exception as e:
+        return {"error": str(e)}
+
+@st.cache_data(ttl=3600)
+def fmp_get_key_metrics(symbol):
+    """주요 지표 (Market Cap, P/E 등)"""
+    if not API_KEY:
+        return {"error": "NO_API_KEY"}
+    
+    url = f"{BASE_URL}/key-metrics/{symbol}?limit=1&apikey={API_KEY}"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
+        
+        return data
+    except Exception as e:
+        return {"error": str(e)}
+
+def calculate_debt_to_equity_fmp(balance_sheet_data, ratios_data, show_debug=False):
     """부채비율 계산"""
     
-    # Balance Sheet에서 계산
+    # 방법 1: Ratios API에서 직접 가져오기 (가장 정확)
+    if ratios_data and "error" not in ratios_data:
+        if show_debug:
+            st.write("**Financial Ratios Data:**")
+            relevant = {k: v for k, v in ratios_data.items() if 'debt' in k.lower() or 'equity' in k.lower()}
+            st.json(relevant)
+        
+        # debtEquityRatio 필드
+        if "debtEquityRatio" in ratios_data:
+            ratio = ratios_data["debtEquityRatio"]
+            if ratio is not None and ratio != "":
+                try:
+                    result = float(ratio)
+                    if show_debug:
+                        st.success(f"✅ D/E Ratio from ratios API: {result}")
+                    return round(result, 2)
+                except Exception:
+                    pass
+    
+    # 방법 2: Balance Sheet에서 계산
     if balance_sheet_data and "error" not in balance_sheet_data:
         try:
             if show_debug:
-                st.write("**Balance Sheet Response:**")
-                st.json(balance_sheet_data)
+                st.write("**Balance Sheet Data:**")
+                relevant = {k: v for k, v in balance_sheet_data.items() if 'debt' in k.lower() or 'equity' in k.lower()}
+                st.json(relevant)
             
-            # annualReports 또는 quarterlyReports 확인
-            reports = balance_sheet_data.get("annualReports") or balance_sheet_data.get("quarterlyReports")
+            # Total Debt
+            debt = None
+            debt_keys = ["totalDebt", "totalLiabilities", "longTermDebt"]
+            for key in debt_keys:
+                if key in balance_sheet_data and balance_sheet_data[key] is not None:
+                    try:
+                        debt = float(balance_sheet_data[key])
+                        if show_debug:
+                            st.success(f"✓ Debt ({key}): {debt:,.0f}")
+                        break
+                    except Exception:
+                        pass
             
-            if reports and len(reports) > 0:
-                latest_report = reports[0]
-                
+            # Total Equity
+            equity = None
+            equity_keys = ["totalStockholdersEquity", "totalEquity"]
+            for key in equity_keys:
+                if key in balance_sheet_data and balance_sheet_data[key] is not None:
+                    try:
+                        equity = float(balance_sheet_data[key])
+                        if show_debug:
+                            st.success(f"✓ Equity ({key}): {equity:,.0f}")
+                        break
+                    except Exception:
+                        pass
+            
+            if debt and equity and equity != 0:
+                ratio = round(debt / equity, 2)
                 if show_debug:
-                    st.write("**Latest Report:**")
-                    st.json(latest_report)
-                
-                # Total Debt 찾기
-                debt = None
-                debt_keys = ["shortLongTermDebtTotal", "longTermDebt", "totalLiabilities"]
-                for key in debt_keys:
-                    if key in latest_report and latest_report[key] not in [None, "None", ""]:
-                        try:
-                            debt = float(latest_report[key])
-                            if show_debug:
-                                st.success(f"✓ Found debt ({key}): {debt:,.0f}")
-                            break
-                        except Exception:
-                            pass
-                
-                # Total Equity 찾기
-                equity = None
-                equity_keys = ["totalShareholderEquity", "commonStockSharesOutstanding"]
-                for key in equity_keys:
-                    if key in latest_report and latest_report[key] not in [None, "None", ""]:
-                        try:
-                            equity = float(latest_report[key])
-                            if show_debug:
-                                st.success(f"✓ Found equity ({key}): {equity:,.0f}")
-                            break
-                        except Exception:
-                            pass
-                
-                if debt and equity and equity != 0:
-                    ratio = round(debt / equity, 2)
-                    if show_debug:
-                        st.success(f"✅ D/E Ratio: {debt:,.0f} / {equity:,.0f} = {ratio}")
-                    return ratio
-                else:
-                    if show_debug:
-                        st.warning(f"Missing data - Debt: {debt}, Equity: {equity}")
-                        
+                    st.success(f"✅ Calculated D/E: {debt:,.0f} / {equity:,.0f} = {ratio}")
+                return ratio
         except Exception as e:
             if show_debug:
                 st.error(f"Calculation error: {e}")
-                import traceback
-                st.code(traceback.format_exc())
     
     return None
 
-def calculate_current_ratio(balance_sheet_data, show_debug=False):
+def calculate_current_ratio_fmp(balance_sheet_data, ratios_data, show_debug=False):
     """유동비율 계산"""
-    if not balance_sheet_data or "error" in balance_sheet_data:
-        return None
     
-    try:
-        reports = balance_sheet_data.get("annualReports") or balance_sheet_data.get("quarterlyReports")
-        
-        if reports and len(reports) > 0:
-            latest_report = reports[0]
+    # 방법 1: Ratios API에서 직접 가져오기
+    if ratios_data and "error" not in ratios_data:
+        if "currentRatio" in ratios_data:
+            ratio = ratios_data["currentRatio"]
+            if ratio is not None and ratio != "":
+                try:
+                    result = float(ratio)
+                    if show_debug:
+                        st.success(f"✅ Current Ratio from ratios API: {result}")
+                    return round(result, 2)
+                except Exception:
+                    pass
+    
+    # 방법 2: Balance Sheet에서 계산
+    if balance_sheet_data and "error" not in balance_sheet_data:
+        try:
+            ca = balance_sheet_data.get("totalCurrentAssets")
+            cl = balance_sheet_data.get("totalCurrentLiabilities")
             
-            ca = latest_report.get("totalCurrentAssets")
-            cl = latest_report.get("totalCurrentLiabilities")
-            
-            if ca and cl and ca not in ["None", None] and cl not in ["None", None]:
+            if ca and cl and ca is not None and cl is not None:
                 ca = float(ca)
                 cl = float(cl)
                 
@@ -171,10 +226,13 @@ def calculate_current_ratio(balance_sheet_data, show_debug=False):
                     st.write(f"Current Liabilities: {cl:,.0f}")
                 
                 if cl != 0:
-                    return round(ca / cl, 2)
-    except Exception as e:
-        if show_debug:
-            st.error(f"Error: {e}")
+                    ratio = round(ca / cl, 2)
+                    if show_debug:
+                        st.success(f"✅ Calculated Current Ratio: {ratio}")
+                    return ratio
+        except Exception as e:
+            if show_debug:
+                st.error(f"Error: {e}")
     
     return None
 
@@ -188,83 +246,55 @@ def get_data(ticker_symbol, field_name, show_debug=False):
     
     try:
         if show_debug:
-            st.write(f"**Fetching data for {ticker_symbol}...**")
-            st.write(f"**Field: {field_name}**")
-            st.write(f"**API Key: {'*' * (len(API_KEY) - 4) + API_KEY[-4:]}**")
+            st.write(f"**Fetching {ticker_symbol} - {field_name}**")
         
         # ------------------------------
         # ① 가격 (price)
         # ------------------------------
         if field_name == "price":
-            quote_data = get_alpha_vantage_quote(ticker_symbol)
+            quote_data = fmp_get_quote(ticker_symbol)
             
             if show_debug:
-                st.write("**Quote API Response:**")
+                st.write("**Quote Data:**")
                 st.json(quote_data)
             
-            # 에러 체크
             if "error" in quote_data:
                 if show_debug:
-                    st.error(f"API Error: {quote_data.get('message', 'Unknown error')}")
+                    st.error(f"Error: {quote_data['error']}")
                 return "N/A"
             
             # API 제한 체크
-            if "Note" in quote_data:
-                if show_debug:
-                    st.warning("⚠️ API call frequency limit reached (5 calls/min, 500 calls/day)")
-                return "API_LIMIT"
-            
-            # Invalid API key 체크
             if "Error Message" in quote_data:
                 if show_debug:
-                    st.error(f"❌ {quote_data['Error Message']}")
-                return "INVALID_API_KEY"
+                    st.error(f"API Error: {quote_data['Error Message']}")
+                return "API_ERROR"
             
-            # Global Quote 데이터 추출
-            if "Global Quote" in quote_data:
-                global_quote = quote_data["Global Quote"]
-                
-                if show_debug:
-                    st.write("**Global Quote:**")
-                    st.json(global_quote)
-                
-                # 가격 필드들 확인
-                price_keys = ["05. price", "price", "05price"]
-                for key in price_keys:
-                    if key in global_quote:
-                        try:
-                            price = float(global_quote[key])
-                            if show_debug:
-                                st.success(f"✅ Price found: ${price}")
-                            return price
-                        except Exception:
-                            pass
+            # 가격 추출
+            price_keys = ["price", "previousClose"]
+            for key in price_keys:
+                if key in quote_data and quote_data[key] is not None:
+                    try:
+                        price = float(quote_data[key])
+                        if show_debug:
+                            st.success(f"✅ Price ({key}): ${price}")
+                        return price
+                    except Exception:
+                        pass
             
             if show_debug:
-                st.error("❌ Failed to extract price from response")
+                st.error("Failed to extract price")
             return "N/A"
-        
-        # 나머지 필드는 overview 또는 balance sheet 필요
-        overview_data = get_alpha_vantage_overview(ticker_symbol)
-        
-        if show_debug:
-            st.write("**Overview API Response:**")
-            if "error" in overview_data:
-                st.error(f"Error: {overview_data.get('message')}")
-            elif "Note" in overview_data:
-                st.warning("API limit reached")
-            else:
-                st.json(dict(list(overview_data.items())[:10]))
         
         # ------------------------------
         # ② 부채비율 (debtToEquity)
         # ------------------------------
         if field_name == "debtToEquity":
-            balance_sheet_data = get_alpha_vantage_balance_sheet(ticker_symbol)
+            ratios_data = fmp_get_financial_ratios(ticker_symbol)
+            balance_sheet_data = fmp_get_balance_sheet(ticker_symbol)
             
-            ratio = calculate_debt_to_equity(overview_data, balance_sheet_data, show_debug)
+            ratio = calculate_debt_to_equity_fmp(balance_sheet_data, ratios_data, show_debug)
             
-            if ratio:
+            if ratio is not None:
                 return ratio
             
             if show_debug:
@@ -275,11 +305,12 @@ def get_data(ticker_symbol, field_name, show_debug=False):
         # ③ 유동비율 (currentRatio)
         # ------------------------------
         if field_name == "currentRatio":
-            balance_sheet_data = get_alpha_vantage_balance_sheet(ticker_symbol)
+            ratios_data = fmp_get_financial_ratios(ticker_symbol)
+            balance_sheet_data = fmp_get_balance_sheet(ticker_symbol)
             
-            ratio = calculate_current_ratio(balance_sheet_data, show_debug)
+            ratio = calculate_current_ratio_fmp(balance_sheet_data, ratios_data, show_debug)
             
-            if ratio:
+            if ratio is not None:
                 return ratio
             
             if show_debug:
@@ -287,54 +318,95 @@ def get_data(ticker_symbol, field_name, show_debug=False):
             return "N/A"
         
         # ------------------------------
-        # ④ Overview의 다른 필드들
+        # ④ 기타 필드들
         # ------------------------------
-        if overview_data and "error" not in overview_data and "Note" not in overview_data:
-            if show_debug:
-                st.write("**Available overview fields:**")
-                st.write(list(overview_data.keys()))
+        
+        # Profile, Key Metrics, Ratios에서 찾기
+        profile_data = fmp_get_profile(ticker_symbol)
+        key_metrics_data = fmp_get_key_metrics(ticker_symbol)
+        ratios_data = fmp_get_financial_ratios(ticker_symbol)
+        
+        if show_debug:
+            st.write("**Available data sources:**")
+            st.write(f"- Profile: {'✓' if 'error' not in profile_data else '✗'}")
+            st.write(f"- Key Metrics: {'✓' if 'error' not in key_metrics_data else '✗'}")
+            st.write(f"- Ratios: {'✓' if 'error' not in ratios_data else '✗'}")
+        
+        # 필드 매핑
+        field_mapping = {
+            "marketCap": ("mktCap", "profile"),  # (필드명, 소스)
+            "trailingPE": ("peRatio", "ratios"),
+            "forwardPE": ("forwardPE", "profile"),
+            "priceToBook": ("priceToBookRatio", "ratios"),
+            "dividendYield": ("dividendYield", "profile"),
+            "beta": ("beta", "profile"),
+            "eps": ("eps", "profile"),
+            "revenue": ("revenue", "key_metrics"),
+            "volume": ("volume", "profile"),
+        }
+        
+        # 매핑된 필드 확인
+        if field_name in field_mapping:
+            mapped_field, source = field_mapping[field_name]
             
-            # 필드명 매핑
-            field_mapping = {
-                "marketCap": "MarketCapitalization",
-                "trailingPE": "PERatio",
-                "forwardPE": "ForwardPE",
-                "priceToBook": "PriceToBookRatio",
-                "dividendYield": "DividendYield",
-                "profitMargins": "ProfitMargin",
-                "beta": "Beta",
-                "eps": "EPS",
-                "revenue": "RevenueTTM",
-                "grossProfit": "GrossProfitTTM",
-                "ebitda": "EBITDA",
-                "52WeekHigh": "52WeekHigh",
-                "52WeekLow": "52WeekLow",
-            }
+            if source == "profile" and "error" not in profile_data:
+                if mapped_field in profile_data and profile_data[mapped_field] is not None:
+                    value = profile_data[mapped_field]
+                    if show_debug:
+                        st.success(f"✅ Found in profile: {mapped_field} = {value}")
+                    try:
+                        return float(value)
+                    except Exception:
+                        return value
             
-            alpha_field = field_mapping.get(field_name, field_name)
+            elif source == "key_metrics" and "error" not in key_metrics_data:
+                if mapped_field in key_metrics_data and key_metrics_data[mapped_field] is not None:
+                    value = key_metrics_data[mapped_field]
+                    if show_debug:
+                        st.success(f"✅ Found in key_metrics: {mapped_field} = {value}")
+                    try:
+                        return float(value)
+                    except Exception:
+                        return value
             
-            if alpha_field in overview_data and overview_data[alpha_field] not in ["None", None, ""]:
-                value = overview_data[alpha_field]
+            elif source == "ratios" and "error" not in ratios_data:
+                if mapped_field in ratios_data and ratios_data[mapped_field] is not None:
+                    value = ratios_data[mapped_field]
+                    if show_debug:
+                        st.success(f"✅ Found in ratios: {mapped_field} = {value}")
+                    try:
+                        return float(value)
+                    except Exception:
+                        return value
+        
+        # 원본 필드명으로도 검색
+        for data_source, data in [("profile", profile_data), ("key_metrics", key_metrics_data), ("ratios", ratios_data)]:
+            if "error" not in data and field_name in data and data[field_name] is not None:
+                value = data[field_name]
+                if show_debug:
+                    st.success(f"✅ Found in {data_source}: {field_name} = {value}")
                 try:
                     return float(value)
                 except Exception:
                     return value
-            
-            if field_name in overview_data and overview_data[field_name] not in ["None", None, ""]:
-                value = overview_data[field_name]
-                try:
-                    return float(value)
-                except Exception:
-                    return value
-            
-            if show_debug:
-                st.warning(f"Field '{field_name}' (mapped to '{alpha_field}') not found")
+        
+        if show_debug:
+            st.write("**Available fields in profile:**")
+            if "error" not in profile_data:
+                st.write(list(profile_data.keys())[:20])
+            st.write("**Available fields in key_metrics:**")
+            if "error" not in key_metrics_data:
+                st.write(list(key_metrics_data.keys())[:20])
+            st.write("**Available fields in ratios:**")
+            if "error" not in ratios_data:
+                st.write(list(ratios_data.keys())[:20])
+            st.warning(f"Field '{field_name}' not found")
         
         return "N/A"
         
     except Exception as e:
         if show_debug:
-            st.error(f"Unexpected error: {e}")
+            st.error(f"Error: {e}")
             import traceback
             st.code(traceback.format_exc())
         return "N/A"
@@ -346,20 +418,20 @@ if ticker and field:
     result = get_data(ticker, field, show_debug)
     st.json({"ticker": ticker, "field": field, "value": result})
 else:
-    st.write("**📊 Finance Data API - Alpha Vantage**")
+    st.write("**📊 Finance Data API - Financial Modeling Prep**")
     st.write("")
     
     if not API_KEY:
-        st.error("⚠️ API 키가 설정되지 않았습니다!")
+        st.error("⚠️ FMP API 키가 설정되지 않았습니다!")
         st.write("")
         st.write("**설정 방법:**")
-        st.write("1. https://www.alphavantage.co/support/#api-key 에서 무료 API 키 발급 (이메일만 입력)")
-        st.write("2. Streamlit Cloud → App 설정 → Secrets 탭")
-        st.write("3. 다음 내용 추가:")
-        st.code('ALPHA_VANTAGE_API_KEY = "YOUR_API_KEY_HERE"', language="toml")
-        st.write("4. 로컬 개발 시: `.streamlit/secrets.toml` 파일 생성 후 동일 내용 추가")
+        st.write("1. https://site.financialmodelingprep.com/developer/docs/ 접속")
+        st.write("2. 무료 가입 (이메일만 입력)")
+        st.write("3. Dashboard에서 API 키 복사")
+        st.write("4. Streamlit Cloud → App 설정 → Secrets:")
+        st.code('FMP_API_KEY = "YOUR_API_KEY_HERE"', language="toml")
     else:
-        st.success(f"✓ API 키 설정됨: {'*' * (len(API_KEY) - 4) + API_KEY[-4:]}")
+        st.success(f"✓ API 키 설정됨: ...{API_KEY[-8:]}")
     
     st.write("")
     st.write("**테스트:**")
@@ -370,26 +442,39 @@ else:
     st.code("?ticker=AAPL&field=price")
     st.code("?ticker=AAPL&field=debtToEquity")
     st.code("?ticker=MSFT&field=marketCap")
+    st.code("?ticker=GOOGL&field=trailingPE")
     
     st.write("")
     st.write("**지원 필드:**")
-    col1, col2 = st.columns(2)
+    
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.write("**가격/비율:**")
+        st.write("**가격/거래:**")
         st.write("- `price` - 현재 주가")
+        st.write("- `volume` - 거래량")
+        st.write("- `beta` - 베타")
+        
+    with col2:
+        st.write("**비율:**")
         st.write("- `debtToEquity` - 부채비율")
         st.write("- `currentRatio` - 유동비율")
         st.write("- `trailingPE` - PER")
         st.write("- `priceToBook` - PBR")
         
-    with col2:
-        st.write("**재무 지표:**")
+    with col3:
+        st.write("**재무:**")
         st.write("- `marketCap` - 시가총액")
         st.write("- `revenue` - 매출")
-        st.write("- `ebitda` - EBITDA")
         st.write("- `eps` - 주당순이익")
-        st.write("- `dividendYield` - 배당수익률")
+        st.write("- `dividendYield` - 배당률")
     
     st.write("")
-    st.info("💡 무료 API: 분당 5회, 일일 500회 제한 (캐싱으로 최적화)")
+    st.info("💡 무료 플랜: 250 requests/day (캐싱으로 최적화)")
+    
+    st.write("")
+    st.write("**FMP 장점:**")
+    st.write("✅ Alpha Vantage보다 많은 무료 호출 (250 vs 25)")
+    st.write("✅ 재무 비율이 이미 계산되어 있음 (D/E, Current Ratio 등)")
+    st.write("✅ 안정적인 API")
+    st.write("✅ 실시간 데이터")
