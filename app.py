@@ -153,21 +153,3 @@ else:
     st.write("- `debtToEquity`: 부채비율")
     st.write("- `currentRatio`: 유동비율")
     st.write("- 기타 yfinance info 필드 (예: `marketCap`, `trailingPE` 등)")
-```
-
-## 주요 개선사항:
-
-1. **중복 import 제거**: `yfinance`와 `pandas`를 한 번만 import
-2. **get_info() 대신 info 사용**: `t.info`로 직접 접근 (더 안정적)
-3. **에러 메시지 추가**: 디버깅을 위해 `st.error()`로 에러 표시
-4. **재무제표 항목명 업데이트**: yfinance의 최신 항목명으로 수정
-5. **None 체크 강화**: `is not None`으로 명시적 체크
-6. **빈 데이터프레임 체크**: `df.empty` 확인 추가
-7. **사용 안내 개선**: 파라미터 없을 때 명확한 안내 메시지
-
-## 테스트 방법:
-```
-?ticker=AAPL&field=price
-?ticker=AAPL&field=debtToEquity
-?ticker=AAPL&field=currentRatio
-?ticker=AAPL&field=marketCap
