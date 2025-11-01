@@ -7,7 +7,7 @@ st.title("📡 Finance Data API (for Google Sheets)")
 
 ticker = st.query_params.get("ticker", "")
 field = st.query_params.get("field", "")
-debug = st.query_params.get("debug", "")  # ?debug=true 추가 시 상세 정보 표시
+debug = st.query_params.get("debug", "")
 
 def get_data(ticker, field, show_debug=False):
     try:
@@ -28,80 +28,67 @@ def get_data(ticker, field, show_debug=False):
                 return "N/A"
         
         # ------------------------------
-        # ② 부채비율 (Debt to Equity)
+        # ② 부채비율 (Debt to Equity) - info에서 직접 가져오기
         # ------------------------------
         if field == "debtToEquity":
             try:
-                bs = t.balance_sheet
-                
-                if bs is None or bs.empty:
-                    if show_debug:
-                        st.error("Balance sheet is empty")
-                    return "N/A"
-                
-                # 디버그 모드: 사용 가능한 모든 항목 출력
-                if show_debug:
-                    st.write("**Available Balance Sheet Items:**")
-                    st.write(bs.index.tolist())
-                    st.write("**Latest Balance Sheet:**")
-                    st.dataframe(bs.iloc[:, 0])
-                
-                latest_col = bs.columns[0]
-                
-                # 부채 항목 찾기 (yfinance 최신 버전 기준)
-                debt_candidates = [
-                    "Total Debt",
-                    "TotalDebt",
-                    "Net Debt",
-                    "NetDebt",
-                    "Long Term Debt",
-                    "LongTermDebt",
-                    "Short Long Term Debt",
-                    "Current Debt"
-                ]
-                
-                # 자본 항목 찾기
-                equity_candidates = [
-                    "Stockholders Equity",
-                    "StockholdersEquity",
-                    "Total Equity Gross Minority Interest",
-                    "TotalEquityGrossMinorityInterest",
-                    "Common Stock Equity",
-                    "CommonStockEquity",
-                    "Tangible Book Value",
-                    "TangibleBookValue"
-                ]
-                
-                debt = None
-                equity = None
-                debt_found = None
-                equity_found = None
-                
-                # 부채 찾기
-                for name in debt_candidates:
-                    if name in bs.index:
-                        debt = bs.loc[name, latest_col]
-                        debt_found = name
-                        break
-                
-                # 자본 찾기
-                for name in equity_candidates:
-                    if name in bs.index:
-                        equity = bs.loc[name, latest_col]
-                        equity_found = name
-                        break
+                info = t.info
                 
                 if show_debug:
-                    st.write(f"**Debt found:** {debt_found} = {debt}")
-                    st.write(f"**Equity found:** {equity_found} = {equity}")
+                    st.write("**Trying to get debtToEquity from info...**")
                 
-                if debt is not None and equity is not None and equity != 0:
-                    ratio = round(float(debt) / float(equity), 2)
-                    return ratio
-                else:
+                # 방법 1: info에서 직접 debtToEquity 가져오기
+                if 'debtToEquity' in info and info['debtToEquity'] is not None:
+                    return float(info['debtToEquity']) / 100  # 종종 퍼센트로 저장됨
+                
+                # 방법 2: totalDebt와 totalStockholderEquity로 계산
+                total_debt = info.get('totalDebt', None)
+                stockholder_equity = info.get('totalStockholderEquity', None)
+                
+                if show_debug:
+                    st.write(f"Total Debt: {total_debt}")
+                    st.write(f"Stockholder Equity: {stockholder_equity}")
+                
+                if total_debt and stockholder_equity and stockholder_equity != 0:
+                    return round(float(total_debt) / float(stockholder_equity), 2)
+                
+                # 방법 3: 재무제표에서 가져오기 (quarterly 포함)
+                try:
+                    # 연간 재무제표 시도
+                    bs = t.balance_sheet
+                    if bs is None or bs.empty:
+                        # 분기 재무제표 시도
+                        bs = t.quarterly_balance_sheet
+                    
+                    if bs is not None and not bs.empty:
+                        if show_debug:
+                            st.write("**Balance Sheet Items:**")
+                            st.write(bs.index.tolist())
+                        
+                        latest_col = bs.columns[0]
+                        
+                        # 다양한 항목명 시도
+                        debt = None
+                        equity = None
+                        
+                        for d in ["Total Debt", "TotalDebt", "Net Debt", "Long Term Debt"]:
+                            if d in bs.index:
+                                debt = bs.loc[d, latest_col]
+                                break
+                        
+                        for e in ["Stockholders Equity", "StockholdersEquity", 
+                                  "Total Equity Gross Minority Interest", "Common Stock Equity"]:
+                            if e in bs.index:
+                                equity = bs.loc[e, latest_col]
+                                break
+                        
+                        if debt is not None and equity is not None and equity != 0:
+                            return round(float(debt) / float(equity), 2)
+                except Exception as bs_error:
                     if show_debug:
-                        st.warning("Could not find both debt and equity")
-                    return "N/A"
+                        st.warning(f"Balance sheet error: {bs_error}")
+                
+                return "N/A"
                     
             except Exception as e:
                 if show_debug:
@@ -111,65 +98,52 @@ def get_data(ticker, field, show_debug=False):
                 return "N/A"
         
         # ------------------------------
-        # ③ 유동비율 (Current Ratio)
+        # ③ 유동비율 (Current Ratio) - info에서 직접 가져오기
         # ------------------------------
         if field == "currentRatio":
             try:
-                bs = t.balance_sheet
-                
-                if bs is None or bs.empty:
-                    if show_debug:
-                        st.error("Balance sheet is empty")
-                    return "N/A"
+                info = t.info
                 
                 if show_debug:
-                    st.write("**Available Balance Sheet Items:**")
-                    st.write(bs.index.tolist())
+                    st.write("**Trying to get currentRatio from info...**")
                 
-                latest_col = bs.columns[0]
+                # 방법 1: info에서 직접 currentRatio 가져오기
+                if 'currentRatio' in info and info['currentRatio'] is not None:
+                    return float(info['currentRatio'])
                 
-                ca_candidates = [
-                    "Current Assets",
-                    "CurrentAssets",
-                    "Total Current Assets",
-                    "TotalCurrentAssets"
-                ]
-                
-                cl_candidates = [
-                    "Current Liabilities",
-                    "CurrentLiabilities",
-                    "Total Current Liabilities",
-                    "TotalCurrentLiabilities"
-                ]
-                
-                ca = None
-                cl = None
-                ca_found = None
-                cl_found = None
-                
-                for name in ca_candidates:
-                    if name in bs.index:
-                        ca = bs.loc[name, latest_col]
-                        ca_found = name
-                        break
-                
-                for name in cl_candidates:
-                    if name in bs.index:
-                        cl = bs.loc[name, latest_col]
-                        cl_found = name
-                        break
-                
-                if show_debug:
-                    st.write(f"**Current Assets found:** {ca_found} = {ca}")
-                    st.write(f"**Current Liabilities found:** {cl_found} = {cl}")
-                
-                if ca is not None and cl is not None and cl != 0:
-                    ratio = round(float(ca) / float(cl), 2)
-                    return ratio
-                else:
+                # 방법 2: 재무제표에서 계산
+                try:
+                    bs = t.balance_sheet
+                    if bs is None or bs.empty:
+                        bs = t.quarterly_balance_sheet
+                    
+                    if bs is not None and not bs.empty:
+                        if show_debug:
+                            st.write("**Balance Sheet Items:**")
+                            st.write(bs.index.tolist())
+                        
+                        latest_col = bs.columns[0]
+                        
+                        ca = None
+                        cl = None
+                        
+                        for c in ["Current Assets", "CurrentAssets", "Total Current Assets"]:
+                            if c in bs.index:
+                                ca = bs.loc[c, latest_col]
+                                break
+                        
+                        for c in ["Current Liabilities", "CurrentLiabilities", "Total Current Liabilities"]:
+                            if c in bs.index:
+                                cl = bs.loc[c, latest_col]
+                                break
+                        
+                        if ca is not None and cl is not None and cl != 0:
+                            return round(float(ca) / float(cl), 2)
+                except Exception as bs_error:
                     if show_debug:
-                        st.warning("Could not find both current assets and liabilities")
-                    return "N/A"
+                        st.warning(f"Balance sheet error: {bs_error}")
+                
+                return "N/A"
                     
             except Exception as e:
                 if show_debug:
@@ -185,14 +159,15 @@ def get_data(ticker, field, show_debug=False):
             info = t.info
             
             if show_debug:
-                st.write("**Available info fields:**")
-                st.write(list(info.keys()))
+                st.write("**Sample info fields:**")
+                sample_keys = list(info.keys())[:20]
+                st.write(sample_keys)
             
-            if field in info:
+            if field in info and info[field] is not None:
                 return info[field]
             else:
                 if show_debug:
-                    st.warning(f"Field '{field}' not found in info")
+                    st.warning(f"Field '{field}' not found or is None in info")
                 return "N/A"
                 
         except Exception as e:
@@ -221,4 +196,9 @@ else:
     st.write("- `price`: 현재 주가")
     st.write("- `debtToEquity`: 부채비율")
     st.write("- `currentRatio`: 유동비율")
-    st.write("- 기타 yfinance info 필드 (예: `marketCap`, `trailingPE` 등)")
+    st.write("- 기타 yfinance info 필드")
+    st.write("")
+    st.write("**info에서 직접 가져올 수 있는 재무 필드 예시:**")
+    st.write("- `totalDebt`, `totalStockholderEquity`, `totalCash`")
+    st.write("- `totalRevenue`, `ebitda`, `netIncomeToCommon`")
+    st.write("- `marketCap`, `enterpriseValue`, `profitMargins`")
