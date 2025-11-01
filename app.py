@@ -1,7 +1,8 @@
 import streamlit as st
-import requests
+import yfinance as yf
 import pandas as pd
 from datetime import datetime
+import time
 
 st.set_page_config(page_title="Finance API")
 st.title("📡 Finance Data API (for Google Sheets)")
@@ -10,239 +11,256 @@ ticker = st.query_params.get("ticker", "")
 field = st.query_params.get("field", "")
 debug = st.query_params.get("debug", "")
 
-# API 키 가져오기
-API_KEY = None
-try:
-    API_KEY = st.secrets["FMP_API_KEY"]
-except Exception:
-    import os
-    API_KEY = os.environ.get("FMP_API_KEY")
-
-if not API_KEY and not ticker:
-    st.error("⚠️ FMP API 키가 설정되지 않았습니다.")
-    st.write("**설정 방법:**")
-    st.write("1. https://site.financialmodelingprep.com/developer/docs/ 에서 무료 가입")
-    st.write("2. API 키 발급 (무료: 250 requests/day)")
-    st.write("3. Streamlit Cloud → Settings → Secrets:")
-    st.code('FMP_API_KEY = "your_api_key_here"', language="toml")
-
-BASE_URL = "https://financialmodelingprep.com/api/v3"
+def create_session():
+    """안정적인 세션 생성"""
+    import requests
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+    
+    session = requests.Session()
+    
+    # 재시도 전략
+    retries = Retry(
+        total=5,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"]
+    )
+    
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    
+    # User-Agent 설정
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+    })
+    
+    return session
 
 @st.cache_data(ttl=300)  # 5분 캐시
-def fmp_get_quote(symbol):
-    """실시간 가격"""
-    if not API_KEY:
-        return {"error": "NO_API_KEY"}
+def get_ticker_price(symbol, max_retries=3):
+    """가격 가져오기"""
+    session = create_session()
     
-    url = f"{BASE_URL}/quote/{symbol}?apikey={API_KEY}"
+    for attempt in range(max_retries):
+        try:
+            # 방법 1: download 사용
+            df = yf.download(
+                symbol,
+                period="2d",
+                progress=False,
+                session=session,
+                threads=False
+            )
+            
+            if not df.empty and 'Close' in df.columns:
+                price = float(df['Close'].iloc[-1])
+                if price > 0:
+                    return {"price": price, "source": "download"}
+        except Exception:
+            pass
+        
+        try:
+            # 방법 2: Ticker.history
+            ticker = yf.Ticker(symbol, session=session)
+            hist = ticker.history(period="2d")
+            
+            if not hist.empty and 'Close' in hist.columns:
+                price = float(hist['Close'].iloc[-1])
+                if price > 0:
+                    return {"price": price, "source": "history"}
+        except Exception:
+            pass
+        
+        try:
+            # 방법 3: fast_info
+            ticker = yf.Ticker(symbol, session=session)
+            if hasattr(ticker, 'fast_info'):
+                if hasattr(ticker.fast_info, 'last_price'):
+                    price = ticker.fast_info.last_price
+                    if price and price > 0:
+                        return {"price": float(price), "source": "fast_info"}
+        except Exception:
+            pass
+        
+        # 재시도 전 대기
+        if attempt < max_retries - 1:
+            time.sleep(2 ** attempt)
     
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        if isinstance(data, list) and len(data) > 0:
-            return data[0]
-        
-        return data
-    except Exception as e:
-        return {"error": str(e)}
+    return None
 
 @st.cache_data(ttl=3600)  # 1시간 캐시
-def fmp_get_profile(symbol):
-    """회사 프로필 (기본 정보)"""
-    if not API_KEY:
-        return {"error": "NO_API_KEY"}
+def get_ticker_info(symbol, max_retries=3):
+    """회사 정보 가져오기"""
+    session = create_session()
     
-    url = f"{BASE_URL}/profile/{symbol}?apikey={API_KEY}"
+    for attempt in range(max_retries):
+        try:
+            ticker = yf.Ticker(symbol, session=session)
+            info = ticker.info
+            
+            if info and len(info) > 0:
+                return info
+        except Exception:
+            pass
+        
+        # 재시도 전 대기
+        if attempt < max_retries - 1:
+            time.sleep(2 ** attempt)
     
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        if isinstance(data, list) and len(data) > 0:
-            return data[0]
-        
-        return data
-    except Exception as e:
-        return {"error": str(e)}
+    return {}
 
 @st.cache_data(ttl=3600)
-def fmp_get_balance_sheet(symbol):
-    """재무상태표"""
-    if not API_KEY:
-        return {"error": "NO_API_KEY"}
+def get_balance_sheet(symbol, quarterly=False, max_retries=3):
+    """재무상태표 가져오기"""
+    session = create_session()
     
-    url = f"{BASE_URL}/balance-sheet-statement/{symbol}?limit=1&apikey={API_KEY}"
+    for attempt in range(max_retries):
+        try:
+            ticker = yf.Ticker(symbol, session=session)
+            
+            if quarterly:
+                bs = ticker.quarterly_balance_sheet
+            else:
+                bs = ticker.balance_sheet
+            
+            if bs is not None and not bs.empty:
+                return bs
+        except Exception:
+            pass
+        
+        # 재시도 전 대기
+        if attempt < max_retries - 1:
+            time.sleep(2 ** attempt)
     
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        if isinstance(data, list) and len(data) > 0:
-            return data[0]
-        
-        return data
-    except Exception as e:
-        return {"error": str(e)}
+    return None
 
-@st.cache_data(ttl=3600)
-def fmp_get_financial_ratios(symbol):
-    """재무 비율 (P/E, D/E, Current Ratio 등)"""
-    if not API_KEY:
-        return {"error": "NO_API_KEY"}
-    
-    url = f"{BASE_URL}/ratios/{symbol}?limit=1&apikey={API_KEY}"
-    
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        if isinstance(data, list) and len(data) > 0:
-            return data[0]
-        
-        return data
-    except Exception as e:
-        return {"error": str(e)}
-
-@st.cache_data(ttl=3600)
-def fmp_get_key_metrics(symbol):
-    """주요 지표 (Market Cap, P/E 등)"""
-    if not API_KEY:
-        return {"error": "NO_API_KEY"}
-    
-    url = f"{BASE_URL}/key-metrics/{symbol}?limit=1&apikey={API_KEY}"
-    
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        if isinstance(data, list) and len(data) > 0:
-            return data[0]
-        
-        return data
-    except Exception as e:
-        return {"error": str(e)}
-
-def calculate_debt_to_equity_fmp(balance_sheet_data, ratios_data, show_debug=False):
+def calculate_debt_to_equity(info, balance_sheet, show_debug=False):
     """부채비율 계산"""
     
-    # 방법 1: Ratios API에서 직접 가져오기 (가장 정확)
-    if ratios_data and "error" not in ratios_data:
+    # 방법 1: info에서 직접 가져오기
+    if info:
         if show_debug:
-            st.write("**Financial Ratios Data:**")
-            relevant = {k: v for k, v in ratios_data.items() if 'debt' in k.lower() or 'equity' in k.lower()}
-            st.json(relevant)
+            debt_equity_keys = {k: v for k, v in info.items() if 'debt' in k.lower() or 'equity' in k.lower()}
+            if debt_equity_keys:
+                st.write("**Info - Debt/Equity keys:**")
+                st.json(debt_equity_keys)
         
-        # debtEquityRatio 필드
-        if "debtEquityRatio" in ratios_data:
-            ratio = ratios_data["debtEquityRatio"]
-            if ratio is not None and ratio != "":
-                try:
-                    result = float(ratio)
-                    if show_debug:
-                        st.success(f"✅ D/E Ratio from ratios API: {result}")
-                    return round(result, 2)
-                except Exception:
-                    pass
+        # totalDebt와 totalStockholderEquity로 계산
+        total_debt = info.get('totalDebt')
+        total_equity = info.get('totalStockholderEquity')
+        
+        if total_debt and total_equity and total_equity != 0:
+            ratio = round(float(total_debt) / float(total_equity), 2)
+            if show_debug:
+                st.success(f"✅ From info: {total_debt:,} / {total_equity:,} = {ratio}")
+            return ratio
     
     # 방법 2: Balance Sheet에서 계산
-    if balance_sheet_data and "error" not in balance_sheet_data:
+    if balance_sheet is not None and not balance_sheet.empty:
         try:
             if show_debug:
-                st.write("**Balance Sheet Data:**")
-                relevant = {k: v for k, v in balance_sheet_data.items() if 'debt' in k.lower() or 'equity' in k.lower()}
-                st.json(relevant)
+                st.write("**Balance Sheet Items:**")
+                st.write(balance_sheet.index.tolist())
             
-            # Total Debt
+            latest_col = balance_sheet.columns[0]
+            
+            # Debt 찾기
             debt = None
-            debt_keys = ["totalDebt", "totalLiabilities", "longTermDebt"]
-            for key in debt_keys:
-                if key in balance_sheet_data and balance_sheet_data[key] is not None:
-                    try:
-                        debt = float(balance_sheet_data[key])
-                        if show_debug:
-                            st.success(f"✓ Debt ({key}): {debt:,.0f}")
-                        break
-                    except Exception:
-                        pass
+            debt_patterns = ['total debt', 'debt', 'liabilities']
+            for pattern in debt_patterns:
+                matching = [idx for idx in balance_sheet.index if pattern in str(idx).lower()]
+                if matching:
+                    for match in matching:
+                        val = balance_sheet.loc[match, latest_col]
+                        if pd.notna(val) and val != 0:
+                            debt = float(val)
+                            if show_debug:
+                                st.success(f"✓ Debt: {match} = {debt:,.0f}")
+                            break
+                if debt:
+                    break
             
-            # Total Equity
+            # Equity 찾기
             equity = None
-            equity_keys = ["totalStockholdersEquity", "totalEquity"]
-            for key in equity_keys:
-                if key in balance_sheet_data and balance_sheet_data[key] is not None:
-                    try:
-                        equity = float(balance_sheet_data[key])
-                        if show_debug:
-                            st.success(f"✓ Equity ({key}): {equity:,.0f}")
-                        break
-                    except Exception:
-                        pass
+            equity_patterns = ['stockholder', 'equity', 'shareholder']
+            for pattern in equity_patterns:
+                matching = [idx for idx in balance_sheet.index if pattern in str(idx).lower()]
+                if matching:
+                    for match in matching:
+                        val = balance_sheet.loc[match, latest_col]
+                        if pd.notna(val) and val != 0:
+                            equity = float(val)
+                            if show_debug:
+                                st.success(f"✓ Equity: {match} = {equity:,.0f}")
+                            break
+                if equity:
+                    break
             
             if debt and equity and equity != 0:
                 ratio = round(debt / equity, 2)
                 if show_debug:
-                    st.success(f"✅ Calculated D/E: {debt:,.0f} / {equity:,.0f} = {ratio}")
+                    st.success(f"✅ Calculated: {debt:,.0f} / {equity:,.0f} = {ratio}")
                 return ratio
+                
         except Exception as e:
             if show_debug:
                 st.error(f"Calculation error: {e}")
     
     return None
 
-def calculate_current_ratio_fmp(balance_sheet_data, ratios_data, show_debug=False):
+def calculate_current_ratio(balance_sheet, show_debug=False):
     """유동비율 계산"""
+    if balance_sheet is None or balance_sheet.empty:
+        return None
     
-    # 방법 1: Ratios API에서 직접 가져오기
-    if ratios_data and "error" not in ratios_data:
-        if "currentRatio" in ratios_data:
-            ratio = ratios_data["currentRatio"]
-            if ratio is not None and ratio != "":
-                try:
-                    result = float(ratio)
+    try:
+        latest_col = balance_sheet.columns[0]
+        
+        # Current Assets
+        ca = None
+        ca_patterns = ['current asset']
+        for pattern in ca_patterns:
+            matching = [idx for idx in balance_sheet.index if pattern in str(idx).lower()]
+            if matching:
+                val = balance_sheet.loc[matching[0], latest_col]
+                if pd.notna(val):
+                    ca = float(val)
                     if show_debug:
-                        st.success(f"✅ Current Ratio from ratios API: {result}")
-                    return round(result, 2)
-                except Exception:
-                    pass
-    
-    # 방법 2: Balance Sheet에서 계산
-    if balance_sheet_data and "error" not in balance_sheet_data:
-        try:
-            ca = balance_sheet_data.get("totalCurrentAssets")
-            cl = balance_sheet_data.get("totalCurrentLiabilities")
-            
-            if ca and cl and ca is not None and cl is not None:
-                ca = float(ca)
-                cl = float(cl)
-                
-                if show_debug:
-                    st.write(f"Current Assets: {ca:,.0f}")
-                    st.write(f"Current Liabilities: {cl:,.0f}")
-                
-                if cl != 0:
-                    ratio = round(ca / cl, 2)
+                        st.success(f"✓ Current Assets: {ca:,.0f}")
+                    break
+        
+        # Current Liabilities
+        cl = None
+        cl_patterns = ['current liab']
+        for pattern in cl_patterns:
+            matching = [idx for idx in balance_sheet.index if pattern in str(idx).lower()]
+            if matching:
+                val = balance_sheet.loc[matching[0], latest_col]
+                if pd.notna(val):
+                    cl = float(val)
                     if show_debug:
-                        st.success(f"✅ Calculated Current Ratio: {ratio}")
-                    return ratio
-        except Exception as e:
+                        st.success(f"✓ Current Liabilities: {cl:,.0f}")
+                    break
+        
+        if ca and cl and cl != 0:
+            ratio = round(ca / cl, 2)
             if show_debug:
-                st.error(f"Error: {e}")
+                st.success(f"✅ Current Ratio: {ratio}")
+            return ratio
+    except Exception as e:
+        if show_debug:
+            st.error(f"Error: {e}")
     
     return None
 
 def get_data(ticker_symbol, field_name, show_debug=False):
-    """데이터 조회 메인 함수"""
-    
-    if not API_KEY:
-        if show_debug:
-            st.error("❌ API key not configured")
-        return "NO_API_KEY"
+    """메인 데이터 조회 함수"""
     
     try:
         if show_debug:
@@ -252,47 +270,32 @@ def get_data(ticker_symbol, field_name, show_debug=False):
         # ① 가격 (price)
         # ------------------------------
         if field_name == "price":
-            quote_data = fmp_get_quote(ticker_symbol)
+            price_data = get_ticker_price(ticker_symbol)
             
             if show_debug:
-                st.write("**Quote Data:**")
-                st.json(quote_data)
+                st.write("**Price data:**")
+                st.json(price_data)
             
-            if "error" in quote_data:
-                if show_debug:
-                    st.error(f"Error: {quote_data['error']}")
-                return "N/A"
-            
-            # API 제한 체크
-            if "Error Message" in quote_data:
-                if show_debug:
-                    st.error(f"API Error: {quote_data['Error Message']}")
-                return "API_ERROR"
-            
-            # 가격 추출
-            price_keys = ["price", "previousClose"]
-            for key in price_keys:
-                if key in quote_data and quote_data[key] is not None:
-                    try:
-                        price = float(quote_data[key])
-                        if show_debug:
-                            st.success(f"✅ Price ({key}): ${price}")
-                        return price
-                    except Exception:
-                        pass
+            if price_data and "price" in price_data:
+                return price_data["price"]
             
             if show_debug:
-                st.error("Failed to extract price")
+                st.error("❌ Failed to get price")
             return "N/A"
         
         # ------------------------------
         # ② 부채비율 (debtToEquity)
         # ------------------------------
         if field_name == "debtToEquity":
-            ratios_data = fmp_get_financial_ratios(ticker_symbol)
-            balance_sheet_data = fmp_get_balance_sheet(ticker_symbol)
+            info = get_ticker_info(ticker_symbol)
+            balance_sheet = get_balance_sheet(ticker_symbol, quarterly=False)
             
-            ratio = calculate_debt_to_equity_fmp(balance_sheet_data, ratios_data, show_debug)
+            if not balance_sheet or balance_sheet.empty:
+                if show_debug:
+                    st.warning("Annual balance sheet empty, trying quarterly...")
+                balance_sheet = get_balance_sheet(ticker_symbol, quarterly=True)
+            
+            ratio = calculate_debt_to_equity(info, balance_sheet, show_debug)
             
             if ratio is not None:
                 return ratio
@@ -305,10 +308,12 @@ def get_data(ticker_symbol, field_name, show_debug=False):
         # ③ 유동비율 (currentRatio)
         # ------------------------------
         if field_name == "currentRatio":
-            ratios_data = fmp_get_financial_ratios(ticker_symbol)
-            balance_sheet_data = fmp_get_balance_sheet(ticker_symbol)
+            balance_sheet = get_balance_sheet(ticker_symbol, quarterly=False)
             
-            ratio = calculate_current_ratio_fmp(balance_sheet_data, ratios_data, show_debug)
+            if not balance_sheet or balance_sheet.empty:
+                balance_sheet = get_balance_sheet(ticker_symbol, quarterly=True)
+            
+            ratio = calculate_current_ratio(balance_sheet, show_debug)
             
             if ratio is not None:
                 return ratio
@@ -318,89 +323,23 @@ def get_data(ticker_symbol, field_name, show_debug=False):
             return "N/A"
         
         # ------------------------------
-        # ④ 기타 필드들
+        # ④ 기타 info 필드
         # ------------------------------
-        
-        # Profile, Key Metrics, Ratios에서 찾기
-        profile_data = fmp_get_profile(ticker_symbol)
-        key_metrics_data = fmp_get_key_metrics(ticker_symbol)
-        ratios_data = fmp_get_financial_ratios(ticker_symbol)
+        info = get_ticker_info(ticker_symbol)
         
         if show_debug:
-            st.write("**Available data sources:**")
-            st.write(f"- Profile: {'✓' if 'error' not in profile_data else '✗'}")
-            st.write(f"- Key Metrics: {'✓' if 'error' not in key_metrics_data else '✗'}")
-            st.write(f"- Ratios: {'✓' if 'error' not in ratios_data else '✗'}")
+            st.write(f"**Info keys ({len(info)}):**")
+            if info:
+                st.write(list(info.keys())[:30])
         
-        # 필드 매핑
-        field_mapping = {
-            "marketCap": ("mktCap", "profile"),  # (필드명, 소스)
-            "trailingPE": ("peRatio", "ratios"),
-            "forwardPE": ("forwardPE", "profile"),
-            "priceToBook": ("priceToBookRatio", "ratios"),
-            "dividendYield": ("dividendYield", "profile"),
-            "beta": ("beta", "profile"),
-            "eps": ("eps", "profile"),
-            "revenue": ("revenue", "key_metrics"),
-            "volume": ("volume", "profile"),
-        }
-        
-        # 매핑된 필드 확인
-        if field_name in field_mapping:
-            mapped_field, source = field_mapping[field_name]
-            
-            if source == "profile" and "error" not in profile_data:
-                if mapped_field in profile_data and profile_data[mapped_field] is not None:
-                    value = profile_data[mapped_field]
-                    if show_debug:
-                        st.success(f"✅ Found in profile: {mapped_field} = {value}")
-                    try:
-                        return float(value)
-                    except Exception:
-                        return value
-            
-            elif source == "key_metrics" and "error" not in key_metrics_data:
-                if mapped_field in key_metrics_data and key_metrics_data[mapped_field] is not None:
-                    value = key_metrics_data[mapped_field]
-                    if show_debug:
-                        st.success(f"✅ Found in key_metrics: {mapped_field} = {value}")
-                    try:
-                        return float(value)
-                    except Exception:
-                        return value
-            
-            elif source == "ratios" and "error" not in ratios_data:
-                if mapped_field in ratios_data and ratios_data[mapped_field] is not None:
-                    value = ratios_data[mapped_field]
-                    if show_debug:
-                        st.success(f"✅ Found in ratios: {mapped_field} = {value}")
-                    try:
-                        return float(value)
-                    except Exception:
-                        return value
-        
-        # 원본 필드명으로도 검색
-        for data_source, data in [("profile", profile_data), ("key_metrics", key_metrics_data), ("ratios", ratios_data)]:
-            if "error" not in data and field_name in data and data[field_name] is not None:
-                value = data[field_name]
-                if show_debug:
-                    st.success(f"✅ Found in {data_source}: {field_name} = {value}")
-                try:
-                    return float(value)
-                except Exception:
-                    return value
+        if info and field_name in info and info[field_name] is not None:
+            value = info[field_name]
+            if show_debug:
+                st.success(f"✅ Found: {field_name} = {value}")
+            return value
         
         if show_debug:
-            st.write("**Available fields in profile:**")
-            if "error" not in profile_data:
-                st.write(list(profile_data.keys())[:20])
-            st.write("**Available fields in key_metrics:**")
-            if "error" not in key_metrics_data:
-                st.write(list(key_metrics_data.keys())[:20])
-            st.write("**Available fields in ratios:**")
-            if "error" not in ratios_data:
-                st.write(list(ratios_data.keys())[:20])
-            st.warning(f"Field '{field_name}' not found")
+            st.warning(f"Field '{field_name}' not found in info")
         
         return "N/A"
         
@@ -418,22 +357,15 @@ if ticker and field:
     result = get_data(ticker, field, show_debug)
     st.json({"ticker": ticker, "field": field, "value": result})
 else:
-    st.write("**📊 Finance Data API - Financial Modeling Prep**")
+    st.write("**📊 Finance Data API - yfinance**")
+    st.write("")
+    st.write("**특징:**")
+    st.write("✅ 무료, API 키 불필요")
+    st.write("✅ 실시간 가격 데이터")
+    st.write("✅ 재무제표 데이터")
+    st.write("✅ 안정적인 재시도 로직")
     st.write("")
     
-    if not API_KEY:
-        st.error("⚠️ FMP API 키가 설정되지 않았습니다!")
-        st.write("")
-        st.write("**설정 방법:**")
-        st.write("1. https://site.financialmodelingprep.com/developer/docs/ 접속")
-        st.write("2. 무료 가입 (이메일만 입력)")
-        st.write("3. Dashboard에서 API 키 복사")
-        st.write("4. Streamlit Cloud → App 설정 → Secrets:")
-        st.code('FMP_API_KEY = "YOUR_API_KEY_HERE"', language="toml")
-    else:
-        st.success(f"✓ API 키 설정됨: ...{API_KEY[-8:]}")
-    
-    st.write("")
     st.write("**테스트:**")
     st.code("?ticker=AAPL&field=price&debug=true")
     
@@ -441,40 +373,24 @@ else:
     st.write("**사용 예시:**")
     st.code("?ticker=AAPL&field=price")
     st.code("?ticker=AAPL&field=debtToEquity")
-    st.code("?ticker=MSFT&field=marketCap")
-    st.code("?ticker=GOOGL&field=trailingPE")
+    st.code("?ticker=MSFT&field=currentRatio")
+    st.code("?ticker=GOOGL&field=marketCap")
     
     st.write("")
-    st.write("**지원 필드:**")
-    
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.write("**가격/거래:**")
+        st.write("**지원 필드:**")
         st.write("- `price` - 현재 주가")
-        st.write("- `volume` - 거래량")
-        st.write("- `beta` - 베타")
-        
-    with col2:
-        st.write("**비율:**")
         st.write("- `debtToEquity` - 부채비율")
         st.write("- `currentRatio` - 유동비율")
-        st.write("- `trailingPE` - PER")
-        st.write("- `priceToBook` - PBR")
         
-    with col3:
-        st.write("**재무:**")
+    with col2:
+        st.write("**info 필드:**")
         st.write("- `marketCap` - 시가총액")
-        st.write("- `revenue` - 매출")
-        st.write("- `eps` - 주당순이익")
+        st.write("- `trailingPE` - PER")
         st.write("- `dividendYield` - 배당률")
+        st.write("- 기타 yfinance info 필드")
     
     st.write("")
-    st.info("💡 무료 플랜: 250 requests/day (캐싱으로 최적화)")
-    
-    st.write("")
-    st.write("**FMP 장점:**")
-    st.write("✅ Alpha Vantage보다 많은 무료 호출 (250 vs 25)")
-    st.write("✅ 재무 비율이 이미 계산되어 있음 (D/E, Current Ratio 등)")
-    st.write("✅ 안정적인 API")
-    st.write("✅ 실시간 데이터")
+    st.info("💡 API 키가 필요 없고 무료로 사용 가능합니다!")
