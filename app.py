@@ -542,13 +542,83 @@ def main():
             display_df = result_df[display_columns].copy()
             
             st.dataframe(
-                display_df.style.applymap(
+                display_df.style.map(
                     highlight_returns,
                     subset=['누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률']
                 ),
                 use_container_width=True,
                 height=600
             )
+            
+            # 차트 섹션 - 각 종목별로 차트 표시
+            st.subheader("📊 종목별 트렌드 차트")
+            
+            # 한 행에 3개씩 표시
+            num_cols = 3
+            for i in range(0, len(result_df), num_cols):
+                cols = st.columns(num_cols)
+                
+                for j in range(num_cols):
+                    idx = i + j
+                    if idx < len(result_df):
+                        row = result_df.iloc[idx]
+                        
+                        with cols[j]:
+                            st.markdown(f"**{row['기업명']} ({row['티커']})**")
+                            
+                            # 주가 트렌드
+                            if row['price_data'] is not None:
+                                fig = create_mini_chart(row['price_data'], 'line')
+                                if fig:
+                                    st.plotly_chart(fig, use_container_width=True, key=f"price_{idx}")
+                            
+                            # 변동률 트렌드
+                            if row['daily_changes'] is not None:
+                                changes = row['daily_changes'].dropna()
+                                colors = ['green' if x >= 0 else 'red' for x in changes]
+                                
+                                fig_change = go.Figure()
+                                fig_change.add_trace(go.Bar(
+                                    x=list(range(len(changes))),
+                                    y=changes.values,
+                                    marker_color=colors,
+                                    showlegend=False
+                                ))
+                                fig_change.update_layout(
+                                    height=100,
+                                    margin=dict(l=0, r=0, t=0, b=0),
+                                    xaxis=dict(showticklabels=False, showgrid=False),
+                                    yaxis=dict(range=[change_y_min, change_y_max], showticklabels=False),
+                                    plot_bgcolor='rgba(0,0,0,0)',
+                                    paper_bgcolor='rgba(0,0,0,0)'
+                                )
+                                fig_change.add_hline(y=0, line_dash="dash", line_color="gray", line_width=0.5)
+                                st.plotly_chart(fig_change, use_container_width=True, key=f"change_{idx}")
+                            
+                            # 누적 수익률 트렌드
+                            if row['cumulative_returns'] is not None:
+                                returns = row['cumulative_returns'].dropna()
+                                colors = ['green' if x >= 0 else 'red' for x in returns]
+                                
+                                fig_return = go.Figure()
+                                fig_return.add_trace(go.Bar(
+                                    x=list(range(len(returns))),
+                                    y=returns.values,
+                                    marker_color=colors,
+                                    showlegend=False
+                                ))
+                                fig_return.update_layout(
+                                    height=100,
+                                    margin=dict(l=0, r=0, t=0, b=0),
+                                    xaxis=dict(showticklabels=False, showgrid=False),
+                                    yaxis=dict(range=[return_y_min, return_y_max], showticklabels=False),
+                                    plot_bgcolor='rgba(0,0,0,0)',
+                                    paper_bgcolor='rgba(0,0,0,0)'
+                                )
+                                fig_return.add_hline(y=0, line_dash="dash", line_color="gray", line_width=0.5)
+                                st.plotly_chart(fig_return, use_container_width=True, key=f"return_{idx}")
+                            
+                            st.markdown("---")
             
             # 차트 섹션
             st.subheader("📈 개별 종목 차트")
