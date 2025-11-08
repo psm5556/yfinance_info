@@ -244,10 +244,10 @@ def get_finviz_data(ticker, statement, item):
     except:
         return None
 
-# 주가 데이터 가져오기 (여러 방법 시도)
+# 주가 데이터 가져오기 (Yahoo Finance Chart API - Google Apps Script 방식)
 @st.cache_data(ttl=3600)
 def get_stock_data(ticker, start_date, end_date):
-    """여러 무료 API를 통해 주가 데이터 가져오기"""
+    """Yahoo Finance Chart API를 통해 주가 데이터 가져오기 (Google Apps Script 방식과 동일)"""
     
     # 날짜를 datetime 객체로 변환
     if isinstance(start_date, str):
@@ -255,155 +255,96 @@ def get_stock_data(ticker, start_date, end_date):
     if isinstance(end_date, str):
         end_date = datetime.strptime(end_date, '%Y-%m-%d')
     
-    # 방법 1: Yahoo Finance CSV (가장 안정적)
-    df = get_data_from_yahoo_csv(ticker, start_date, end_date)
-    if df is not None and not df.empty:
-        return df
-    
-    # 방법 2: Alpha Vantage API
-    df = get_data_from_alphavantage(ticker, start_date, end_date)
-    if df is not None and not df.empty:
-        return df
-    
-    # 방법 3: Twelve Data API
-    df = get_data_from_twelvedata(ticker, start_date, end_date)
-    if df is not None and not df.empty:
-        return df
-    
-    print(f"All methods failed for {ticker}")
-    return None
-
-def get_data_from_yahoo_csv(ticker, start_date, end_date):
-    """Yahoo Finance CSV 다운로드"""
     try:
-        start_ts = int(start_date.timestamp())
-        end_ts = int(end_date.timestamp())
+        # UTC 자정 기준으로 타임스탬프 생성 (Google Apps Script와 동일)
+        start_date_utc = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date_utc = end_date.replace(hour=23, minute=59, second=59, microsecond=999000)
         
-        url = f"https://query1.finance.yahoo.com/v7/finance/download/{ticker}"
+        start_timestamp = int(start_date_utc.timestamp())
+        end_timestamp = int(end_date_utc.timestamp())
+        
+        # Yahoo Finance Chart API URL
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
         params = {
-            'period1': start_ts,
-            'period2': end_ts,
-            'interval': '1d',
-            'events': 'history',
-            'includeAdjustedClose': 'true'
+            'period1': start_timestamp,
+            'period2': end_timestamp,
+            'interval': '1d'
         }
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
         response = requests.get(url, params=params, headers=headers, timeout=20)
         
-        if response.status_code == 200 and len(response.text) > 100:
-            from io import StringIO
-            df = pd.read_csv(StringIO(response.text))
-            
-            if 'Date' in df.columns and len(df) > 0:
-                df['Date'] = pd.to_datetime(df['Date'])
-                df = df.set_index('Date')
-                df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
-                df = df.dropna()
-                return df
+        if response.status_code != 200:
+            print(f"HTTP {response.status_code} for {ticker}")
+            return None
         
-        return None
-        
-    except Exception as e:
-        print(f"Yahoo CSV error for {ticker}: {e}")
-        return None
-
-def get_data_from_alphavantage(ticker, start_date, end_date):
-    """Alpha Vantage API (무료, 하루 500 요청)"""
-    try:
-        # 세션에서 API 키 가져오기
-        api_key = st.session_state.get('alphavantage_key', 'demo')
-        
-        url = f"https://www.alphavantage.co/query"
-        params = {
-            'function': 'TIME_SERIES_DAILY',
-            'symbol': ticker,
-            'outputsize': 'full',
-            'apikey': api_key
-        }
-        
-        response = requests.get(url, params=params, timeout=15)
         data = response.json()
         
-        if 'Time Series (Daily)' in data:
-            ts = data['Time Series (Daily)']
-            
-            df = pd.DataFrame.from_dict(ts, orient='index')
-            df.index = pd.to_datetime(df.index)
-            df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-            df = df.sort_index()
-            
-            # 숫자로 변환
-            for col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-            
-            # 기간 필터링
-            df = df[(df.index >= start_date) & (df.index <= end_date)]
-            
-            if not df.empty:
-                return df
+        # 데이터 구조 검증
+        if not data.get('chart') or not data['chart'].get('result') or len(data['chart']['result']) == 0:
+            print(f"Invalid API response for {ticker}")
+            return None
         
-        return None
+        result = data['chart']['result'][0]
         
-    except Exception as e:
-        print(f"Alpha Vantage error for {ticker}: {e}")
-        return None
-
-def get_data_from_twelvedata(ticker, start_date, end_date):
-    """Twelve Data API (무료, 하루 800 요청)"""
-    try:
-        # 세션에서 API 키 가져오기
-        api_key = st.session_state.get('twelvedata_key', 'demo')
+        # timestamp와 indicators 추출
+        timestamps = result.get('timestamp', [])
+        if not timestamps:
+            print(f"No timestamps for {ticker}")
+            return None
         
-        url = "https://api.twelvedata.com/time_series"
-        params = {
-            'symbol': ticker,
-            'interval': '1day',
-            'start_date': start_date.strftime('%Y-%m-%d'),
-            'end_date': end_date.strftime('%Y-%m-%d'),
-            'apikey': api_key
-        }
+        indicators_list = result.get('indicators', {}).get('quote', [])
+        if not indicators_list or len(indicators_list) == 0:
+            print(f"No indicators for {ticker}")
+            return None
         
-        response = requests.get(url, params=params, timeout=15)
-        data = response.json()
+        indicators = indicators_list[0]
         
-        if 'values' in data and len(data['values']) > 0:
-            df = pd.DataFrame(data['values'])
-            df['datetime'] = pd.to_datetime(df['datetime'])
-            df = df.set_index('datetime')
-            df = df.sort_index()
-            
-            # 컬럼명 변경
-            df = df.rename(columns={
-                'open': 'Open',
-                'high': 'High', 
-                'low': 'Low',
-                'close': 'Close',
-                'volume': 'Volume'
-            })
-            
-            # 숫자로 변환
-            for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-            
-            df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
-            df = df.dropna()
-            
-            if not df.empty:
-                return df
+        # 데이터 추출
+        opens = indicators.get('open', [])
+        highs = indicators.get('high', [])
+        lows = indicators.get('low', [])
+        closes = indicators.get('close', [])
+        volumes = indicators.get('volume', [])
         
-        return None
+        # 데이터프레임 생성 (null 값 필터링)
+        data_list = []
+        for i in range(len(timestamps)):
+            # null 체크
+            if (closes[i] is not None and 
+                opens[i] is not None and 
+                highs[i] is not None and 
+                lows[i] is not None):
+                
+                date = datetime.fromtimestamp(timestamps[i])
+                
+                # 날짜 범위 확인
+                if start_date_utc <= date <= end_date_utc:
+                    data_list.append({
+                        'Date': date,
+                        'Open': float(opens[i]),
+                        'High': float(highs[i]),
+                        'Low': float(lows[i]),
+                        'Close': float(closes[i]),
+                        'Volume': int(volumes[i]) if volumes[i] is not None else 0
+                    })
+        
+        if not data_list:
+            print(f"No valid data for {ticker}")
+            return None
+        
+        # 데이터프레임 생성
+        df = pd.DataFrame(data_list)
+        df = df.set_index('Date')
+        df = df.sort_index()
+        
+        return df
         
     except Exception as e:
-        print(f"Twelve Data error for {ticker}: {e}")
+        print(f"Error fetching data for {ticker}: {e}")
         return None
 
 # 미니 차트 생성
@@ -447,24 +388,6 @@ def main():
     
     # 사이드바
     st.sidebar.header("⚙️ 설정")
-    
-    # API 키 설정 (선택사항)
-    with st.sidebar.expander("🔑 API 키 설정 (선택사항)", expanded=False):
-        st.markdown("""
-        더 안정적인 데이터 수집을 위해 무료 API 키를 등록하세요.
-        
-        **무료 API 키 발급:**
-        - [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
-        - [Twelve Data](https://twelvedata.com/pricing)
-        """)
-        
-        alphavantage_key = st.text_input("Alpha Vantage Key", value="demo", type="password")
-        twelvedata_key = st.text_input("Twelve Data Key", value="demo", type="password")
-        
-        if alphavantage_key != "demo":
-            st.session_state['alphavantage_key'] = alphavantage_key
-        if twelvedata_key != "demo":
-            st.session_state['twelvedata_key'] = twelvedata_key
     
     # 기본 날짜 설정
     default_start = datetime(2025, 10, 9)
