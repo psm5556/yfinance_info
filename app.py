@@ -252,25 +252,20 @@ def get_stock_data(ticker, start_date, end_date):
     # 날짜를 datetime 객체로 변환
     if isinstance(start_date, str):
         start_date = datetime.strptime(start_date, '%Y-%m-%d')
-    elif hasattr(start_date, 'date'):  # datetime.date 객체인 경우
+    else:
+        # date 객체를 datetime으로 변환
         start_date = datetime.combine(start_date, datetime.min.time())
     
     if isinstance(end_date, str):
         end_date = datetime.strptime(end_date, '%Y-%m-%d')
-    elif hasattr(end_date, 'date'):  # datetime.date 객체인 경우
+    else:
+        # date 객체를 datetime으로 변환
         end_date = datetime.combine(end_date, datetime.min.time())
     
     try:
-        # UTC 자정 기준으로 타임스탬프 생성 (Google Apps Script와 동일)
-        start_date_utc = start_date.replace(hour=0, minute=0, second=0)
-        # microsecond를 별도로 설정
-        start_date_utc = start_date_utc.replace(microsecond=0)
-        
-        end_date_utc = end_date.replace(hour=23, minute=59, second=59)
-        end_date_utc = end_date_utc.replace(microsecond=999000)
-        
-        start_timestamp = int(start_date_utc.timestamp())
-        end_timestamp = int(end_date_utc.timestamp())
+        # UTC 자정 기준으로 타임스탬프 생성
+        start_timestamp = int(start_date.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+        end_timestamp = int(end_date.replace(hour=23, minute=59, second=59, microsecond=999000).timestamp())
         
         # Yahoo Finance Chart API URL
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
@@ -330,16 +325,14 @@ def get_stock_data(ticker, start_date, end_date):
                 
                 date = datetime.fromtimestamp(timestamps[i])
                 
-                # 날짜 범위 확인
-                if start_date_utc <= date <= end_date_utc:
-                    data_list.append({
-                        'Date': date,
-                        'Open': float(opens[i]),
-                        'High': float(highs[i]),
-                        'Low': float(lows[i]),
-                        'Close': float(closes[i]),
-                        'Volume': int(volumes[i]) if volumes[i] is not None else 0
-                    })
+                data_list.append({
+                    'Date': date,
+                    'Open': float(opens[i]),
+                    'High': float(highs[i]),
+                    'Low': float(lows[i]),
+                    'Close': float(closes[i]),
+                    'Volume': int(volumes[i]) if volumes[i] is not None else 0
+                })
         
         if not data_list:
             print(f"No valid data for {ticker}")
