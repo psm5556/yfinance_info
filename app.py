@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
 import numpy as np
 from datetime import datetime, timedelta
 import requests
@@ -8,6 +7,8 @@ from bs4 import BeautifulSoup
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+import json
+import time
 
 # 페이지 설정
 st.set_page_config(page_title="투자 포트폴리오 대시보드", layout="wide")
@@ -243,16 +244,71 @@ def get_finviz_data(ticker, statement, item):
     except:
         return None
 
-# 주가 데이터 가져오기
+# Yahoo Finance 다운로드 API를 통한 주가 데이터 가져오기
 @st.cache_data(ttl=3600)
 def get_stock_data(ticker, start_date, end_date):
+    """Yahoo Finance 다운로드 API를 통해 주가 데이터 가져오기"""
     try:
-        stock = yf.Ticker(ticker)
-        df = stock.history(start=start_date, end=end_date)
-        if df.empty:
+        # 날짜를 datetime 객체로 변환
+        if isinstance(start_date, str):
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+        if isinstance(end_date, str):
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+        
+        # Unix timestamp 변환
+        start_ts = int(start_date.timestamp())
+        end_ts = int(end_date.timestamp())
+        
+        # Yahoo Finance API URL
+        url = f"https://query1.finance.yahoo.com/v7/finance/download/{ticker}"
+        params = {
+            'period1': start_ts,
+            'period2': end_ts,
+            'interval': '1d',
+            'events': 'history',
+            'includeAdjustedClose': 'true'
+        }
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            from io import StringIO
+            df = pd.read_csv(StringIO(response.text))
+            
+            # 데이터 검증
+            if df.empty or 'Date' not in df.columns:
+                print(f"No data for {ticker}")
+                return None
+            
+            # 인덱스 설정
+            df['Date'] = pd.to_datetime(df['Date'])
+            df = df.set_index('Date')
+            
+            # 필요한 컬럼만 선택
+            required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+            for col in required_cols:
+                if col not in df.columns:
+                    print(f"Missing column {col} for {ticker}")
+                    return None
+            
+            df = df[required_cols]
+            df = df.dropna()
+            
+            if df.empty:
+                print(f"Empty data after cleaning for {ticker}")
+                return None
+            
+            return df
+        else:
+            print(f"HTTP {response.status_code} for {ticker}")
             return None
-        return df
-    except:
+        
+    except Exception as e:
+        print(f"Error fetching data for {ticker}: {e}")
         return None
 
 # 미니 차트 생성
