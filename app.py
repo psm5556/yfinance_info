@@ -297,9 +297,9 @@ def main():
     # 사이드바
     st.sidebar.header("⚙️ 설정")
     
-    # 기본 날짜 설정 (최근 1년)
+    # 기본 날짜 설정
+    default_start = datetime(2025, 10, 9)
     default_end = datetime.now()
-    default_start = default_end - timedelta(days=365)
     
     start_date = st.sidebar.date_input("시작일", default_start)
     end_date = st.sidebar.date_input("종료일", default_end)
