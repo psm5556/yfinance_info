@@ -233,7 +233,7 @@ def get_finviz_metric(ticker, metric_name):
             print(f"[WARNING] {ticker} HTTP {response.status_code}")
             return "-"
         
-        time.sleep(0.5)  # Rate limiting
+        time.sleep(0.1)  # Rate limiting
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -337,7 +337,7 @@ def get_finviz_data(ticker, statement, item):
             print(f"[WARNING] {ticker} API HTTP {response.status_code}")
             return None
         
-        time.sleep(0.5)  # Rate limiting
+        time.sleep(0.1)  # Rate limiting
         
         data = response.json()
 
