@@ -424,149 +424,126 @@ def main():
 
     with tab1:
         if analyze_button or 'results' in st.session_state:
-            # 결과 데이터를 세션 상태에서 가져옴 (버튼 클릭 시만 덮어쓰기)
+            # analyze_button이 눌렸으면 새로 분석 수행
             if analyze_button:
-                # 기존 데이터 수집 및 분석 코드 영역 ...
-                # (분석 완료 후)
+                st.info("데이터를 가져오는 중... 시간이 걸릴 수 있습니다.")
+                results = []
+                progress_bar = st.progress(0)
+    
+                for idx, row in portfolio_df.iterrows():
+                    ticker = row['티커']
+                    progress_bar.progress((idx + 1) / len(portfolio_df))
+                    stock_data = get_stock_data(ticker, start_date, end_date)
+    
+                    if stock_data is not None and len(stock_data) > 0:
+                        base_price = stock_data['Close'].iloc[0]
+                        current_price = stock_data['Close'].iloc[-1]
+                        highest_price = stock_data['Close'].max()
+    
+                        return_from_base = ((current_price - base_price) / base_price) * 100
+                        return_from_high = ((current_price - highest_price) / highest_price) * 100
+    
+                        if len(stock_data) > 1:
+                            daily_return = current_price - stock_data['Close'].iloc[-2]
+                            daily_return_pct = ((current_price - stock_data['Close'].iloc[-2]) / stock_data['Close'].iloc[-2]) * 100
+                        else:
+                            daily_return = 0
+                            daily_return_pct = 0
+    
+                        daily_changes = stock_data['Close'].pct_change() * 100
+                        cumulative_returns = ((stock_data['Close'] / base_price) - 1) * 100
+    
+                        debt_ratio = get_finviz_metric(ticker, "Debt/Eq")
+                        current_ratio = get_finviz_metric(ticker, "Current Ratio")
+                        roe = get_finviz_metric(ticker, "ROE")
+    
+                        total_cash = get_finviz_data(ticker, "BS", "Cash & Short Term Investments")
+                        free_cash_flow = get_finviz_data(ticker, "CF", "Free Cash Flow")
+    
+                        runway = "-"
+                        if total_cash and free_cash_flow and free_cash_flow < 0:
+                            runway = round(total_cash / abs(free_cash_flow), 1)
+    
+                        results.append({
+                            '팀': row['팀'],
+                            '자산': row['자산'],
+                            '섹터': row['섹터'],
+                            '기업명': row['기업명'],
+                            '티커': ticker,
+                            '기준가': round(base_price, 2),
+                            '최고가': round(highest_price, 2),
+                            '현재가': round(current_price, 2),
+                            '누적수익률(기준가)': round(return_from_base, 2),
+                            '누적수익률(최고가)': round(return_from_high, 2),
+                            '일일수익': round(daily_return, 2),
+                            '일일수익률': round(daily_return_pct, 2),
+                            '부채비율': debt_ratio if debt_ratio != "-" else "-",
+                            '유동비율': current_ratio if current_ratio != "-" else "-",
+                            'ROE': roe if roe != "-" else "-",
+                            'Runway(년)': runway,
+                            'Total Cash(M$)': round(total_cash, 2) if total_cash else "-",
+                            'FCF(M$)': round(free_cash_flow, 2) if free_cash_flow else "-",
+                            'price_data': stock_data,
+                            'daily_changes': daily_changes[1:],
+                            'cumulative_returns': cumulative_returns
+                        })
+                    else:
+                        results.append({
+                            '팀': row['팀'],
+                            '자산': row['자산'],
+                            '섹터': row['섹터'],
+                            '기업명': row['기업명'],
+                            '티커': ticker,
+                            '기준가': "-",
+                            '최고가': "-",
+                            '현재가': "-",
+                            '누적수익률(기준가)': "-",
+                            '누적수익률(최고가)': "-",
+                            '일일수익': "-",
+                            '일일수익률': "-",
+                            '부채비율': "-",
+                            '유동비율': "-",
+                            'ROE': "-",
+                            'Runway(년)': "-",
+                            'Total Cash(M$)': "-",
+                            'FCF(M$)': "-",
+                            'price_data': None,
+                            'daily_changes': None,
+                            'cumulative_returns': None
+                        })
+    
+                progress_bar.empty()
+                st.success("✅ 분석 완료!")
+    
                 st.session_state['results'] = results
-                st.session_state['result_df'] = result_df
+                st.session_state['result_df'] = pd.DataFrame(results)
+    
             else:
                 results = st.session_state['results']
                 result_df = st.session_state['result_df']
-            
-            # st.info("데이터를 가져오는 중... 시간이 걸릴 수 있습니다.")
-
-            # 결과 데이터프레임 생성
-            results = []
-            progress_bar = st.progress(0)
-
-            for idx, row in portfolio_df.iterrows():
-                ticker = row['티커']
-
-                # 진행률 업데이트
-                progress_bar.progress((idx + 1) / len(portfolio_df))
-
-                # 주가 데이터 가져오기
-                stock_data = get_stock_data(ticker, start_date, end_date)
-
-                if stock_data is not None and len(stock_data) > 0:
-                    # 기본 계산
-                    base_price = stock_data['Close'].iloc[0]
-                    current_price = stock_data['Close'].iloc[-1]
-                    highest_price = stock_data['Close'].max()
-
-                    # 수익률 계산
-                    return_from_base = ((current_price - base_price) / base_price) * 100
-                    return_from_high = ((current_price - highest_price) / highest_price) * 100
-
-                    # 일일 수익
-                    if len(stock_data) > 1:
-                        daily_return = current_price - stock_data['Close'].iloc[-2]
-                        daily_return_pct = ((current_price - stock_data['Close'].iloc[-2]) / stock_data['Close'].iloc[-2]) * 100
-                    else:
-                        daily_return = 0
-                        daily_return_pct = 0
-
-                    # 변동률 계산 (일별)
-                    daily_changes = stock_data['Close'].pct_change() * 100
-
-                    # 누적 수익률 (기준가 대비)
-                    cumulative_returns = ((stock_data['Close'] / base_price) - 1) * 100
-
-                    # Finviz 메트릭
-                    debt_ratio = get_finviz_metric(ticker, "Debt/Eq")
-                    current_ratio = get_finviz_metric(ticker, "Current Ratio")
-                    roe = get_finviz_metric(ticker, "ROE")
-
-                    # Finviz API 데이터
-                    total_cash = get_finviz_data(ticker, "BS", "Cash & Short Term Investments")
-                    free_cash_flow = get_finviz_data(ticker, "CF", "Free Cash Flow")
-
-                    # Runway 계산 (간단 버전)
-                    runway = "-"
-                    if total_cash and free_cash_flow and free_cash_flow < 0:
-                        runway = round(total_cash / abs(free_cash_flow), 1)
-
-                    results.append({
-                        '팀': row['팀'],
-                        '자산': row['자산'],
-                        '섹터': row['섹터'],
-                        '기업명': row['기업명'],
-                        '티커': ticker,
-                        '기준가': round(base_price, 2),
-                        '최고가': round(highest_price, 2),
-                        '현재가': round(current_price, 2),
-                        '누적수익률(기준가)': round(return_from_base, 2),
-                        '누적수익률(최고가)': round(return_from_high, 2),
-                        '일일수익': round(daily_return, 2),
-                        '일일수익률': round(daily_return_pct, 2),
-                        '부채비율': debt_ratio if debt_ratio != "-" else "-",
-                        '유동비율': current_ratio if current_ratio != "-" else "-",
-                        'ROE': roe if roe != "-" else "-",
-                        'Runway(년)': runway,
-                        'Total Cash(M$)': round(total_cash, 2) if total_cash else "-",
-                        'FCF(M$)': round(free_cash_flow, 2) if free_cash_flow else "-",
-                        'price_data': stock_data,
-                        'daily_changes': daily_changes[1:],
-                        'cumulative_returns': cumulative_returns
-                    })
-                else:
-                    # 데이터가 없는 경우
-                    results.append({
-                        '팀': row['팀'],
-                        '자산': row['자산'],
-                        '섹터': row['섹터'],
-                        '기업명': row['기업명'],
-                        '티커': ticker,
-                        '기준가': "-",
-                        '최고가': "-",
-                        '현재가': "-",
-                        '누적수익률(기준가)': "-",
-                        '누적수익률(최고가)': "-",
-                        '일일수익': "-",
-                        '일일수익률': "-",
-                        '부채비율': "-",
-                        '유동비율': "-",
-                        'ROE': "-",
-                        'Runway(년)': "-",
-                        'Total Cash(M$)': "-",
-                        'FCF(M$)': "-",
-                        'price_data': None,
-                        'daily_changes': None,
-                        'cumulative_returns': None
-                    })
-
-            progress_bar.empty()
-            st.success("✅ 분석 완료!")
-
+    
             # 결과 표시
             st.subheader("포트폴리오 상세 분석")
-
-            # 데이터프레임으로 변환
-            result_df = pd.DataFrame(results)
-
-            # 컬럼 구성
+    
             display_columns = ['팀', '자산', '섹터', '기업명', '티커', '기준가', '최고가', '현재가',
                                '누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률',
                                '부채비율', '유동비율', 'ROE', 'Runway(년)', 'Total Cash(M$)', 'FCF(M$)']
-
-            # 스타일링 함수
+    
             def highlight_returns(val):
                 if isinstance(val, (int, float)):
                     color = 'green' if val >= 0 else 'red'
                     return f'color: {color}'
                 return ''
-
-            # 표시용 데이터프레임
-            display_df = result_df[display_columns].copy()
-
+    
+            display_df = st.session_state['result_df'][display_columns].copy()
+    
             st.dataframe(
                 display_df.style.applymap(
                     highlight_returns,
                     subset=['누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률']
                 ),
                 use_container_width=True,
-                height=int(600 * SCALE)  # 600 → 450
+                height=int(600 * SCALE)
             )
 
             # 차트 섹션
