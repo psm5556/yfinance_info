@@ -504,9 +504,9 @@ def main():
                 '부채비율', '유동비율', 'ROE'
             ]
 
-            # float 컬럼만 소수점 둘째자리로 반올림 (결측값/문자열은 그대로)
-            for col in float_cols:
-                display_df[col] = pd.to_numeric(display_df[col], errors='coerce').round(2).astype('float').map(lambda x: '-' if pd.isna(x) else x)
+            # # float 컬럼만 소수점 둘째자리로 반올림 (결측값/문자열은 그대로)
+            # for col in float_cols:
+            #     display_df[col] = pd.to_numeric(display_df[col], errors='coerce').round(2).astype('float').map(lambda x: '-' if pd.isna(x) else x)
 
             # 각 컬럼별 포맷 함수 생성
             fmt_dict = {col: "{:.2f}".format for col in float_cols}
