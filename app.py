@@ -799,17 +799,19 @@ def main():
                                     marker_color=colors,
                                     showlegend=False,
                                     name=row['티커'],
-                                    yaxis=dict(range=[return_y_min, return_y_max]),
+                                    
                                 ),
                                 row=row_num,
                                 col=col_num
+                            )
+                            fig.update_layout(
+                                yaxis=dict(range=[return_y_min, return_y_max]),
                             )
                     
                     fig.update_layout(
                         height=300 * rows,
                         title_text=f"{sector} 섹터 변동률",
                         showlegend=False,
-                        
                     )
                     
                     # 모든 서브플롯에 0선 추가
