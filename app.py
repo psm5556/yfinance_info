@@ -323,48 +323,95 @@ def get_stock_data(ticker, start_date, end_date):
         print(f"Error fetching data for {ticker}: {e}")
         return None
 
-# 미니 차트 생성
-def create_mini_chart(data, chart_type='line'):
-    if data is None or len(data) == 0:
-        return None
+# 개별 종목 차트 표시 함수
+def display_stock_chart(selected_data):
+    """선택된 종목의 상세 차트를 표시"""
+    if selected_data['price_data'] is not None:
+        st.markdown("---")
+        st.subheader(f"📈 {selected_data['기업명']} ({selected_data['티커']}) 상세 차트")
+        
+        col1, col2, col3, col4 = st.columns(4)
 
-    fig = go.Figure()
-    line_width = max(int(1 * SCALE), 1)
-    bar_height = int(50 * SCALE)
+        with col1:
+            st.metric("현재가", f"${selected_data['현재가']}", f"{selected_data['일일수익률']}%")
 
-    if chart_type == 'line':
-        fig.add_trace(go.Scatter(
-            x=data.index,
-            y=data['Close'],
+        with col2:
+            st.metric("누적수익률 (기준가)", f"{selected_data['누적수익률(기준가)']}%")
+
+        with col3:
+            st.metric("누적수익률 (최고가)", f"{selected_data['누적수익률(최고가)']}%")
+            
+        with col4:
+            st.metric("섹터", selected_data['섹터'])
+
+        fig_price = go.Figure()
+        fig_price.add_trace(go.Scatter(
+            x=selected_data['price_data'].index,
+            y=selected_data['price_data']['Close'],
             mode='lines',
-            line=dict(width=line_width, color='#1f77b4'),
-            showlegend=False
+            name='주가',
+            line=dict(color='#1f77b4', width=max(int(2 * SCALE), 1))
         ))
-    elif chart_type == 'bar':
-        colors = ['green' if x >= 0 else 'red' for x in data]
-        fig.add_trace(go.Bar(
-            x=list(range(len(data))),
-            y=data,
-            marker_color=colors,
-            showlegend=False
-        ))
+        fig_price.update_layout(
+            title="주가 트렌드",
+            xaxis_title="날짜",
+            yaxis_title="가격 ($)",
+            height=int(400 * SCALE),
+            hovermode='x unified'
+        )
+        st.plotly_chart(fig_price, use_container_width=True)
 
-    fig.update_layout(
-        height=bar_height,
-        margin=dict(l=0, r=0, t=0, b=0),
-        xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
-        yaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)'
-    )
+        col1, col2 = st.columns(2)
 
-    return fig
+        with col1:
+            if selected_data['daily_changes'] is not None:
+                changes = selected_data['daily_changes'].dropna()
+                colors = ['green' if x >= 0 else 'red' for x in changes]
+
+                fig_change = go.Figure()
+                fig_change.add_trace(go.Bar(
+                    x=changes.index,
+                    y=changes.values,
+                    marker_color=colors,
+                    name='일일 변동률'
+                ))
+                fig_change.update_layout(
+                    title="변동률 트렌드",
+                    xaxis_title="날짜",
+                    yaxis_title="변동률 (%)",
+                    height=int(400 * SCALE),
+                    showlegend=False
+                )
+                fig_change.add_hline(y=0, line_dash="dash", line_color="gray")
+                st.plotly_chart(fig_change, use_container_width=True)
+
+        with col2:
+            if selected_data['cumulative_returns'] is not None:
+                returns = selected_data['cumulative_returns'].dropna()
+                colors = ['green' if x >= 0 else 'red' for x in returns]
+
+                fig_return = go.Figure()
+                fig_return.add_trace(go.Bar(
+                    x=returns.index,
+                    y=returns.values,
+                    marker_color=colors,
+                    name='누적 수익률'
+                ))
+                fig_return.update_layout(
+                    title="누적 수익률 트렌드",
+                    xaxis_title="날짜",
+                    yaxis_title="누적 수익률 (%)",
+                    height=int(400 * SCALE),
+                    showlegend=False
+                )
+                fig_return.add_hline(y=0, line_dash="dash", line_color="gray")
+                st.plotly_chart(fig_return, use_container_width=True)
 
 # 메인 앱
 def main():
     st.title("📊 투자 포트폴리오 대시보드")
 
-    st.sidebar.header(" ⚙️ 설정 ")
+    st.sidebar.header("⚙️ 설정")
 
     default_start = datetime(2025, 10, 9)
     default_end = datetime.now()
@@ -438,9 +485,9 @@ def main():
                             '누적수익률(최고가)': round(return_from_high, 2),
                             '일일수익': round(daily_return, 2),
                             '일일수익률': round(daily_return_pct, 2),
-                            '부채비율': debt_ratio if debt_ratio != "-" else "-",
-                            '유동비율': current_ratio if current_ratio != "-" else "-",
-                            'ROE': roe if roe != "-" else "-",
+                            '부채비율': round(debt_ratio, 2) if isinstance(debt_ratio, (int, float)) else "-",
+                            '유동비율': round(current_ratio, 2) if isinstance(current_ratio, (int, float)) else "-",
+                            'ROE': round(roe, 2) if isinstance(roe, (int, float)) else "-",
                             'Runway(년)': runway,
                             'Total Cash(M$)': round(total_cash, 2) if total_cash else "-",
                             'FCF(M$)': round(free_cash_flow, 2) if free_cash_flow else "-",
@@ -495,106 +542,44 @@ def main():
                     return f'color: {color}'
                 return ''
 
+            # 표시용 DataFrame 생성
             display_df = st.session_state['result_df'][display_columns].copy()
+            
+            # 숫자 컬럼 포맷팅 (소수점 2자리)
+            float_cols = [
+                '기준가', '최고가', '현재가',
+                '누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률',
+                '부채비율', '유동비율', 'ROE', 'Runway(년)', 'Total Cash(M$)', 'FCF(M$)'
+            ]
 
-            st.dataframe(
+            for col in float_cols:
+                display_df[col] = display_df[col].apply(
+                    lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x
+                )
+
+            # 테이블 표시 및 행 선택 기능
+            st.info("💡 테이블의 행을 클릭하면 해당 종목의 상세 차트가 아래에 표시됩니다.")
+            
+            event = st.dataframe(
                 display_df.style.applymap(
                     highlight_returns,
                     subset=['누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률']
                 ),
                 use_container_width=True,
-                height=int(600 * SCALE)
+                height=int(600 * SCALE),
+                on_select="rerun",
+                selection_mode="single-row"
             )
 
-            st.subheader("📈 개별 종목 차트")
-
-            selected_ticker = st.selectbox(
-                "종목 선택",
-                st.session_state['result_df']['티커'].tolist(),
-                format_func=lambda x: f"{x} - {st.session_state['result_df'][st.session_state['result_df']['티커'] == x]['기업명'].iloc[0]}"
-            )
-
-            selected_data = st.session_state['result_df'][st.session_state['result_df']['티커'] == selected_ticker].iloc[0]
-
-            if selected_data['price_data'] is not None:
-                col1, col2, col3 = st.columns(3)
-
-                with col1:
-                    st.metric("현재가", f"${selected_data['현재가']}",
-                              f"{selected_data['일일수익률']}%")
-
-                with col2:
-                    st.metric("누적수익률 (기준가)",
-                              f"{selected_data['누적수익률(기준가)']}%")
-
-                with col3:
-                    st.metric("누적수익률 (최고가)",
-                              f"{selected_data['누적수익률(최고가)']}%")
-
-                fig_price = go.Figure()
-                fig_price.add_trace(go.Scatter(
-                    x=selected_data['price_data'].index,
-                    y=selected_data['price_data']['Close'],
-                    mode='lines',
-                    name='주가',
-                    line=dict(color='#1f77b4', width=max(int(2 * SCALE), 1))
-                ))
-                fig_price.update_layout(
-                    title="주가 트렌드",
-                    xaxis_title="날짜",
-                    yaxis_title="가격 ($)",
-                    height=int(400 * SCALE),
-                    hovermode='x unified'
-                )
-                st.plotly_chart(fig_price, use_container_width=True)
-
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    if selected_data['daily_changes'] is not None:
-                        changes = selected_data['daily_changes'].dropna()
-                        colors = ['green' if x >= 0 else 'red' for x in changes]
-
-                        fig_change = go.Figure()
-                        fig_change.add_trace(go.Bar(
-                            x=changes.index,
-                            y=changes.values,
-                            marker_color=colors,
-                            name='일일 변동률'
-                        ))
-                        fig_change.update_layout(
-                            title="변동률 트렌드",
-                            xaxis_title="날짜",
-                            yaxis_title="변동률 (%)",
-                            yaxis=dict(range=[change_y_min, change_y_max]),
-                            height=int(400 * SCALE),
-                            showlegend=False
-                        )
-                        fig_change.add_hline(y=0, line_dash="dash", line_color="gray")
-                        st.plotly_chart(fig_change, use_container_width=True)
-
-                with col2:
-                    if selected_data['cumulative_returns'] is not None:
-                        returns = selected_data['cumulative_returns'].dropna()
-                        colors = ['green' if x >= 0 else 'red' for x in returns]
-
-                        fig_return = go.Figure()
-                        fig_return.add_trace(go.Bar(
-                            x=returns.index,
-                            y=returns.values,
-                            marker_color=colors,
-                            name='누적 수익률'
-                        ))
-                        fig_return.update_layout(
-                            title="누적 수익률 트렌드",
-                            xaxis_title="날짜",
-                            yaxis_title="누적 수익률 (%)",
-                            yaxis=dict(range=[return_y_min, return_y_max]),
-                            height=int(400 * SCALE),
-                            showlegend=False
-                        )
-                        fig_return.add_hline(y=0, line_dash="dash", line_color="gray")
-                        st.plotly_chart(fig_return, use_container_width=True)
+            # 행이 선택되면 해당 종목의 차트 표시
+            if event.selection and len(event.selection.rows) > 0:
+                selected_row_idx = event.selection.rows[0]
+                selected_ticker = st.session_state['result_df'].iloc[selected_row_idx]['티커']
+                selected_data = st.session_state['result_df'][
+                    st.session_state['result_df']['티커'] == selected_ticker
+                ].iloc[0]
+                
+                display_stock_chart(selected_data)
 
         else:
             st.info("분석을 실행해주세요.")
@@ -694,7 +679,7 @@ def main():
                     ))
 
                 fig_sector.update_layout(
-                    title="섹터별 평균 누변동률 비교",
+                    title="섹터별 평균 누적변동률 비교",
                     xaxis_title="날짜",
                     yaxis_title="평균 누적변동률 (%)",
                     height=int(500 * SCALE),
@@ -719,11 +704,14 @@ def main():
                     cols = 5
                     rows = (n_stocks + cols - 1) // cols
 
+                    # 기업명(티커) 형태로 subtitle 생성
+                    subtitles = [f"{row['기업명']}({row['티커']})" for _, row in sector_stocks.iterrows()]
+
                     fig = make_subplots(
                         rows=rows,
                         cols=cols,
-                        subplot_titles=[f"{row['티커']}" for _, row in sector_stocks.iterrows()],
-                        vertical_spacing=0.1 * SCALE,
+                        subplot_titles=subtitles,
+                        vertical_spacing=0.15 * SCALE,  # 행 간격 증가
                         horizontal_spacing=0.03 * SCALE
                     )
 
@@ -746,14 +734,21 @@ def main():
                                 row=row_num,
                                 col=col_num
                             )
-                            fig.update_yaxes(range=[return_y_min, return_y_max])
+                            fig.update_yaxes(range=[return_y_min, return_y_max], row=row_num, col=col_num)
 
+                    # 전체 레이아웃 설정
                     fig.update_layout(
-                        height=int(300 * rows * SCALE),
+                        height=int(350 * rows * SCALE),  # 행 간격을 위해 높이 약간 증가
                         title_text=f"{sector} 섹터 누적변동률",
                         showlegend=False,
                     )
 
+                    # 모든 subplot의 폰트 크기 축소
+                    fig.update_xaxes(title_font=dict(size=8), tickfont=dict(size=7))
+                    fig.update_yaxes(title_font=dict(size=8), tickfont=dict(size=7))
+                    fig.update_annotations(font_size=9)  # subplot 제목 크기
+
+                    # 0선 추가
                     for i in range(1, rows + 1):
                         for j in range(1, cols + 1):
                             fig.add_hline(
