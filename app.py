@@ -675,7 +675,7 @@ def main():
                     fig.add_trace(go.Scatter(x=d.index,y=d.values,mode='lines',name=f"{t} 평균"))
                 fig.add_trace(go.Scatter(x=total_weighted.index,y=total_weighted.values,
                                          mode='lines',name="시장 전체 가중평균",
-                                         line=dict(width=3,dash='dot',color='black')))
+                                         line=dict(width=3,dash='dot',color='red')))
                 fig.update_layout(title="청팀 vs 백팀 누적수익률 비교 (가중평균 포함)",
                                   height=500,hovermode='x unified',
                                   legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
