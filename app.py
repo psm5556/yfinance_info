@@ -423,8 +423,18 @@ def main():
     tab1, tab2 = st.tabs(["📈 포트폴리오 분석", "📊 트렌드 분석"])
 
     with tab1:
-        if analyze_button:
-            st.info("데이터를 가져오는 중... 시간이 걸릴 수 있습니다.")
+        if analyze_button or 'results' in st.session_state:
+            # 결과 데이터를 세션 상태에서 가져옴 (버튼 클릭 시만 덮어쓰기)
+            if analyze_button:
+                # 기존 데이터 수집 및 분석 코드 영역 ...
+                # (분석 완료 후)
+                st.session_state['results'] = results
+                st.session_state['result_df'] = result_df
+            else:
+                results = st.session_state['results']
+                result_df = st.session_state['result_df']
+            
+            # st.info("데이터를 가져오는 중... 시간이 걸릴 수 있습니다.")
 
             # 결과 데이터프레임 생성
             results = []
