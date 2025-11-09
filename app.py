@@ -202,9 +202,15 @@ def load_portfolio_data():
     return df
 
 
-# Finviz 데이터 가져오기 (개선된 버전)
+# Finviz 데이터 가져오기 (구글 스프레드시트 IMPORTHTML 방식 참조)
 @st.cache_data(ttl=86400)
 def get_finviz_metric(ticker, metric_name):
+    """
+    Google Sheets의 IMPORTHTML 방식을 참조한 데이터 추출
+    - 부채비율: table 9, row 12, col 4
+    - 유동비율: table 9, row 11, col 4
+    - ROE: table 9, row 6, col 8
+    """
     try:
         url = f"https://finviz.com/quote.ashx?t={ticker}"
         headers = {
@@ -231,7 +237,48 @@ def get_finviz_metric(ticker, metric_name):
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 방법 1: snapshot-table2 클래스 테이블 찾기
+        # 구글 시트의 IMPORTHTML과 동일하게 모든 테이블을 가져옴
+        all_tables = soup.find_all('table')
+        
+        # metric_name에 따라 테이블 인덱스와 위치 지정
+        metric_mapping = {
+            'Debt/Eq': {'table_idx': 9, 'row': 12, 'col': 4},      # 부채비율
+            'Current Ratio': {'table_idx': 9, 'row': 11, 'col': 4}, # 유동비율
+            'ROE': {'table_idx': 9, 'row': 6, 'col': 8}            # ROE
+        }
+        
+        if metric_name in metric_mapping:
+            mapping = metric_mapping[metric_name]
+            
+            # 테이블 인덱스 확인
+            if len(all_tables) > mapping['table_idx']:
+                target_table = all_tables[mapping['table_idx']]
+                rows = target_table.find_all('tr')
+                
+                # 행 인덱스 확인
+                if len(rows) > mapping['row']:
+                    target_row = rows[mapping['row']]
+                    cells = target_row.find_all('td')
+                    
+                    # 열 인덱스 확인
+                    if len(cells) > mapping['col']:
+                        value = cells[mapping['col']].get_text(strip=True)
+                        
+                        # 값 처리 (구글 시트의 SPLIT 함수가 '*'를 제거하므로 동일하게 처리)
+                        if value == '-' or value == '':
+                            return "-"
+                        
+                        # '*' 기호 제거 및 숫자 변환
+                        value = value.split('*')[0].strip()
+                        value = value.replace('%', '').replace(',', '')
+                        
+                        try:
+                            # 구글 시트에서는 *100을 하므로 여기서는 원본 값 반환 (비율)
+                            return float(value)
+                        except:
+                            return "-"
+        
+        # 매핑에 없는 metric의 경우 기존 방식 사용 (백업)
         tables = soup.find_all('table', {'class': 'snapshot-table2'})
         
         for table in tables:
@@ -250,19 +297,6 @@ def get_finviz_metric(ticker, metric_name):
                             return float(value)
                         except:
                             return value
-        
-        # 방법 2: 모든 td 태그에서 찾기 (백업)
-        all_tds = soup.find_all('td')
-        for i in range(len(all_tds) - 1):
-            if all_tds[i].get_text(strip=True) == metric_name:
-                value = all_tds[i + 1].get_text(strip=True)
-                if value == '-' or value == '':
-                    return "-"
-                value = value.replace('%', '').replace(',', '').replace('B', '').replace('M', '')
-                try:
-                    return float(value)
-                except:
-                    return value
         
         return "-"
         
