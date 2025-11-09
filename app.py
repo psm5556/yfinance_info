@@ -808,7 +808,7 @@ def main():
                     
                     fig.update_layout(
                         height=300 * rows,
-                        title_text=f"{sector} 섹터 변동률",
+                        title_text=f"{sector} 섹터 누적변동률",
                         showlegend=False,
                     )
                     
