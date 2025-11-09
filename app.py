@@ -798,7 +798,8 @@ def main():
                                     y=changes.values,
                                     marker_color=colors,
                                     showlegend=False,
-                                    name=row['티커']
+                                    name=row['티커'],
+                                    yaxis=dict(range=[return_y_min, return_y_max]),
                                 ),
                                 row=row_num,
                                 col=col_num
@@ -808,7 +809,7 @@ def main():
                         height=300 * rows,
                         title_text=f"{sector} 섹터 변동률",
                         showlegend=False,
-                        yaxis=dict(range=[change_y_min, change_y_max]),
+                        
                     )
                     
                     # 모든 서브플롯에 0선 추가
