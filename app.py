@@ -725,8 +725,8 @@ def main():
                         cumulative_returns = ((stock_data['Close'] / base_price) - 1) * 100
 
                         # Finviz에서 재무 데이터 가져오기
-                        debt_ratio = get_finviz_metric(ticker, "Debt/Eq")
-                        current_ratio = get_finviz_metric(ticker, "Current Ratio")
+                        debt_ratio = get_finviz_metric(ticker, "Debt/Eq") * 100
+                        current_ratio = get_finviz_metric(ticker, "Current Ratio") * 100
                         roe = get_finviz_metric(ticker, "ROE")
                         total_cash = get_finviz_data(ticker, "BSQ", "Cash & Short Term Investments")
                         free_cash_flow = get_finviz_data(ticker, "CFA", "Free Cash Flow")
