@@ -789,8 +789,8 @@ def main():
                             changes = row['cumulative_returns'].dropna()
                             colors = ['green' if x >= 0 else 'red' for x in changes]
                             
-                            row_num = (idx // 3) + 1
-                            col_num = (idx % 3) + 1
+                            row_num = (idx // 5) + 1
+                            col_num = (idx % 5) + 1
                             
                             fig.add_trace(
                                 go.Bar(
