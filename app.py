@@ -435,6 +435,25 @@ def get_stock_data_with_ma(ticker, interval="1d"):
         print(f"Error fetching data with MA for {ticker}: {e}")
         return None
 
+# -----------------------------
+# 색상 강조 함수
+# -----------------------------
+def highlight_positive_negative(val):
+    try:
+        v = float(val)
+        if v > 0: return "color: green"
+        elif v < 0: return "color: red"
+    except:
+        return ""
+    return ""
+
+def highlight_low_debt_ratio(val):
+    try:
+        v = float(val)
+        if v <= 30: return "background-color: lightgreen"
+    except:
+        return ""
+    return ""
 
 # 개별 종목 차트 표시 함수
 def display_stock_chart(selected_data, start_date):
@@ -820,11 +839,22 @@ def main():
                     lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x
                 )
 
-            # 번호 컬럼 추가
-            display_df.insert(0, '번호', range(1, len(display_df) + 1))
+            
             
             # 단일 선택을 위한 체크박스 컬럼 추가
-            display_df.insert(1, '선택', False)
+            display_df.insert(0, '선택', False)
+
+            # 번호 컬럼 추가
+            display_df.insert(0, '번호', range(1, len(display_df) + 1))
+
+            # 스타일 적용
+            display_df = (
+                display_df.style
+                .map(highlight_positive_negative,
+                     subset=["누적수익률(기준가)", "누적수익률(최고가)", "일일수익", "일일수익률"])
+                .map(highlight_low_debt_ratio, subset=["부채비율"])
+            )
+            
             
             # 이전 선택 상태 복원 (session_state에 저장)
             if 'selected_ticker' in st.session_state and st.session_state.selected_ticker:
@@ -885,6 +915,24 @@ def main():
                 if 'selected_ticker' in st.session_state:
                     del st.session_state.selected_ticker
                 selected_row = None
+
+            # 티커까지 고정
+            st.markdown("""
+            <style>
+            [data-testid="stDataFrame"] table th:first-child,
+            [data-testid="stDataFrame"] table th:nth-child(2),
+            [data-testid="stDataFrame"] table th:nth-child(3),
+            [data-testid="stDataFrame"] table th:nth-child(4),
+            [data-testid="stDataFrame"] table th:nth-child(5),
+            [data-testid="stDataFrame"] table th:nth-child(6),
+            [data-testid="stDataFrame"] table th:nth-child(7) {
+                position: sticky;
+                left: 0;
+                background-color: white;
+                z-index: 1;
+            }
+            </style>
+            """, unsafe_allow_html=True)
             
             # 차트 표시
             if len(selected_rows) == 1:
