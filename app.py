@@ -14,6 +14,24 @@ import yfinance as yf
 # 크기 조정 상수
 SCALE = 0.75
 
+# 사이드바에 커스텀 CSS 삽입
+st.markdown("""
+<style>
+    /* 사이드바 내의 숫자 입력 및 날짜 입력 박스 높이 조절 */
+    div[data-baseweb="input"] > div > input {
+        height: 1.5em !important;
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+        font-size: 0.85em !important;
+    }
+    /* 버튼 높이 줄이기 */
+    button[kind="primary"] {
+        height: 28px !important;
+        font-size: 0.9em !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # 페이지 설정
 st.set_page_config(page_title="투자 포트폴리오 대시보드", layout="wide")
 
