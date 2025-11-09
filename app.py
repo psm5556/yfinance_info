@@ -758,9 +758,9 @@ def main():
                     ))
 
                 fig_sector.update_layout(
-                    title="섹터별 평균 변동률 비교",
+                    title="섹터별 평균 누변동률 비교",
                     xaxis_title="날짜",
-                    yaxis_title="평균 변동률 (%)",
+                    yaxis_title="평균 누적변동률 (%)",
                     height=int(500 * SCALE),  # 500 → 375
                     hovermode='x unified',
                     legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02)
