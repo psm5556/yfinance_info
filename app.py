@@ -854,6 +854,8 @@ def main():
                      subset=["누적수익률(기준가)", "누적수익률(최고가)", "일일수익", "일일수익률", "ROE"])
                 .map(highlight_low_debt_ratio, subset=["부채비율"])
             )
+
+            
             
             
             # 이전 선택 상태 복원 (session_state에 저장)
@@ -884,6 +886,24 @@ def main():
                 disabled=[col for col in display_df.columns if col not in ['선택']],
                 key='stock_table'
             )
+
+            # 티커까지 고정
+            st.markdown("""
+            <style>
+            [data-testid="stDataFrame"] table th:first-child,
+            [data-testid="stDataFrame"] table th:nth-child(2),
+            [data-testid="stDataFrame"] table th:nth-child(3),
+            [data-testid="stDataFrame"] table th:nth-child(4),
+            [data-testid="stDataFrame"] table th:nth-child(5),
+            [data-testid="stDataFrame"] table th:nth-child(6),
+            [data-testid="stDataFrame"] table th:nth-child(7) {
+                position: sticky;
+                left: 0;
+                background-color: white;
+                z-index: 1;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
             # 선택된 종목 확인
             selected_rows = edited_df[edited_df['선택'] == True]
@@ -916,23 +936,7 @@ def main():
                     del st.session_state.selected_ticker
                 selected_row = None
 
-            # 티커까지 고정
-            st.markdown("""
-            <style>
-            [data-testid="stDataFrame"] table th:first-child,
-            [data-testid="stDataFrame"] table th:nth-child(2),
-            [data-testid="stDataFrame"] table th:nth-child(3),
-            [data-testid="stDataFrame"] table th:nth-child(4),
-            [data-testid="stDataFrame"] table th:nth-child(5),
-            [data-testid="stDataFrame"] table th:nth-child(6),
-            [data-testid="stDataFrame"] table th:nth-child(7) {
-                position: sticky;
-                left: 0;
-                background-color: white;
-                z-index: 1;
-            }
-            </style>
-            """, unsafe_allow_html=True)
+            
             
             # 차트 표시
             if len(selected_rows) == 1:
