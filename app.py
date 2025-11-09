@@ -1035,7 +1035,7 @@ def main():
                     title="섹터별 평균 누적변동률 비교",
                     xaxis_title="날짜",
                     yaxis_title="평균 누적변동률 (%)",
-                    height=int(500 * SCALE),
+                    height=int(1000 * SCALE),
                     hovermode='x unified',
                     legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02)
                 )
