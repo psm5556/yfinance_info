@@ -845,13 +845,13 @@ def main():
             display_df.insert(0, '선택', False)
 
             # 번호 컬럼 추가
-            display_df.insert(0, '번호', range(1, len(display_df) + 1))
+            display_df.insert(1, '번호', range(1, len(display_df) + 1))
 
             # 스타일 적용
             display_df = (
                 display_df.style
                 .map(highlight_positive_negative,
-                     subset=["누적수익률(기준가)", "누적수익률(최고가)", "일일수익", "일일수익률"])
+                     subset=["누적수익률(기준가)", "누적수익률(최고가)", "일일수익", "일일수익률", "ROE"])
                 .map(highlight_low_debt_ratio, subset=["부채비율"])
             )
             
