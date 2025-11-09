@@ -774,7 +774,7 @@ def main():
                     if n_stocks == 0:
                         continue
                     
-                    rows = (n_stocks + 2) // 3  # 3열 레이아웃
+                    rows = (n_stocks + 2) // 5  # 3열 레이아웃
                     
                     fig = make_subplots(
                         rows=rows,
