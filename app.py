@@ -14,24 +14,6 @@ import yfinance as yf
 # 크기 조정 상수
 SCALE = 0.75
 
-# 사이드바에 커스텀 CSS 삽입
-st.markdown("""
-<style>
-    /* 사이드바 내의 숫자 입력 및 날짜 입력 박스 높이 조절 */
-    div[data-baseweb="input"] > div > input {
-        height: 1.5em !important;
-        padding-top: 2px !important;
-        padding-bottom: 2px !important;
-        font-size: 0.85em !important;
-    }
-    /* 버튼 높이 줄이기 */
-    button[kind="primary"] {
-        height: 28px !important;
-        font-size: 0.9em !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 # 페이지 설정
 st.set_page_config(page_title="투자 포트폴리오 대시보드", layout="wide")
 
@@ -252,7 +234,7 @@ def get_finviz_metric(ticker, metric_name):
             print(f"[WARNING] {ticker} HTTP {response.status_code}")
             return "-"
         
-        time.sleep(0.01)  # Rate limiting
+        time.sleep(0.5)  # Rate limiting
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -356,7 +338,7 @@ def get_finviz_data(ticker, statement, item):
             print(f"[WARNING] {ticker} API HTTP {response.status_code}")
             return None
         
-        time.sleep(0.01)  # Rate limiting
+        time.sleep(0.5)  # Rate limiting
         
         data = response.json()
 
@@ -569,19 +551,30 @@ def display_stock_chart(selected_data, start_date):
             if start_date:
                 # start_date를 datetime으로 변환
                 if isinstance(start_date, str):
-                    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                    start_dt = pd.to_datetime(start_date)
                 else:
-                    start_dt = datetime.combine(start_date, datetime.min.time())
+                    start_dt = pd.to_datetime(start_date)
+                
+                # 타임존 정보 맞추기
+                if df_chart.index.tz is not None:
+                    if start_dt.tz is None:
+                        start_dt = start_dt.tz_localize(df_chart.index.tz)
+                else:
+                    if start_dt.tz is not None:
+                        start_dt = start_dt.tz_localize(None)
                 
                 # 차트 데이터 범위 내에 있는지 확인
-                if df_chart.index[0] <= start_dt <= df_chart.index[-1]:
-                    fig_price.add_vline(
-                        x=start_dt,
-                        line_dash="dash",
-                        line_color="red",
-                        annotation_text="시작일",
-                        annotation_position="top"
-                    )
+                try:
+                    if df_chart.index[0] <= start_dt <= df_chart.index[-1]:
+                        fig_price.add_vline(
+                            x=start_dt,
+                            line_dash="dash",
+                            line_color="red",
+                            annotation_text="시작일",
+                            annotation_position="top"
+                        )
+                except:
+                    pass  # 비교 실패 시 무시
             
             fig_price.update_layout(
                 title=f"주가 트렌드 ({chart_interval})",
@@ -630,16 +623,27 @@ def display_stock_chart(selected_data, start_date):
                 # 시작일 세로선 추가
                 if start_date:
                     if isinstance(start_date, str):
-                        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                        start_dt = pd.to_datetime(start_date)
                     else:
-                        start_dt = datetime.combine(start_date, datetime.min.time())
+                        start_dt = pd.to_datetime(start_date)
                     
-                    if changes.index[0] <= start_dt <= changes.index[-1]:
-                        fig_change.add_vline(
-                            x=start_dt,
-                            line_dash="dash",
-                            line_color="red"
-                        )
+                    # 타임존 정보 맞추기
+                    if changes.index.tz is not None:
+                        if start_dt.tz is None:
+                            start_dt = start_dt.tz_localize(changes.index.tz)
+                    else:
+                        if start_dt.tz is not None:
+                            start_dt = start_dt.tz_localize(None)
+                    
+                    try:
+                        if changes.index[0] <= start_dt <= changes.index[-1]:
+                            fig_change.add_vline(
+                                x=start_dt,
+                                line_dash="dash",
+                                line_color="red"
+                            )
+                    except:
+                        pass
                 
                 st.plotly_chart(fig_change, use_container_width=True)
 
@@ -667,16 +671,27 @@ def display_stock_chart(selected_data, start_date):
                 # 시작일 세로선 추가
                 if start_date:
                     if isinstance(start_date, str):
-                        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                        start_dt = pd.to_datetime(start_date)
                     else:
-                        start_dt = datetime.combine(start_date, datetime.min.time())
+                        start_dt = pd.to_datetime(start_date)
                     
-                    if returns.index[0] <= start_dt <= returns.index[-1]:
-                        fig_return.add_vline(
-                            x=start_dt,
-                            line_dash="dash",
-                            line_color="red"
-                        )
+                    # 타임존 정보 맞추기
+                    if returns.index.tz is not None:
+                        if start_dt.tz is None:
+                            start_dt = start_dt.tz_localize(returns.index.tz)
+                    else:
+                        if start_dt.tz is not None:
+                            start_dt = start_dt.tz_localize(None)
+                    
+                    try:
+                        if returns.index[0] <= start_dt <= returns.index[-1]:
+                            fig_return.add_vline(
+                                x=start_dt,
+                                line_dash="dash",
+                                line_color="red"
+                            )
+                    except:
+                        pass
                 
                 st.plotly_chart(fig_return, use_container_width=True)
 
