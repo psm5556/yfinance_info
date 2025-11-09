@@ -11,7 +11,7 @@ import json
 import time
 
 # 크기 조정 상수
-SCALE = 0.5
+SCALE = 0.75
 
 # 페이지 설정
 st.set_page_config(page_title="투자 포트폴리오 대시보드", layout="wide")
