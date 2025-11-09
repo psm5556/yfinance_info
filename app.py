@@ -681,7 +681,7 @@ def main():
                 fig.add_hline(y=0,line_dash="dash",line_color="gray")
                 st.plotly_chart(fig,use_container_width=True)
             
-            # 차트 1: 팀별 평균 변동률 트렌드
+            # 차트 2: 팀별 평균 변동률 트렌드
             st.markdown("### 2️⃣ 팀별 평균 변동률 트렌드")
             
             team_data = {}
@@ -690,8 +690,8 @@ def main():
                 all_changes = []
                 
                 for idx, row in team_stocks.iterrows():
-                    if row['cumulative_returns'] is not None: #cumulative_returns, daily_changes
-                        all_changes.append(row['cumulative_returns'].dropna())
+                    if row['daily_changes'] is not None: #cumulative_returns, daily_changes
+                        all_changes.append(row['daily_changes'].dropna())
                 
                 if all_changes:
                     # 모든 날짜의 평균 계산
@@ -721,8 +721,8 @@ def main():
                 fig_team.add_hline(y=0, line_dash="dash", line_color="gray")
                 st.plotly_chart(fig_team, use_container_width=True)
             
-            # 차트 2: 섹터별 평균 변동률 트렌드
-            st.markdown("### 3️⃣ 섹터별 평균 변동률 트렌드")
+            # 차트 3: 섹터별 평균 누적변동률 트렌드
+            st.markdown("### 3️⃣ 섹터별 평균 누적변동률 트렌드")
             
             sector_data = {}
             for sector in result_df['섹터'].unique():
@@ -731,7 +731,7 @@ def main():
                 
                 for idx, row in sector_stocks.iterrows():
                     if row['cumulative_returns'] is not None:  #cumulative_returns, daily_changes
-                        all_changes.append(row['cumulative_returns'].dropna())
+                        all_changes.append(row['daily_changes'].dropna())
                 
                 if all_changes:
                     combined = pd.concat(all_changes, axis=1)
@@ -760,8 +760,8 @@ def main():
                 fig_sector.add_hline(y=0, line_dash="dash", line_color="gray")
                 st.plotly_chart(fig_sector, use_container_width=True)
             
-            # 차트 3: 섹터별 개별 종목 변동률 (서브플롯)
-            st.markdown("### 4️⃣ 섹터별 개별 종목 변동률")
+            # 차트 4: 섹터별 개별 종목 누적변동률 (서브플롯)
+            st.markdown("### 4️⃣ 섹터별 개별 종목 누적변동률")
             
             sectors = result_df['섹터'].unique()
             
@@ -799,13 +799,12 @@ def main():
                                     marker_color=colors,
                                     showlegend=False,
                                     name=row['티커'],
-                                    
                                 ),
                                 row=row_num,
                                 col=col_num
                             )
-                            fig.update_layout(
-                                yaxis=dict(range=[return_y_min, return_y_max]),
+                            fig.update_yaxes(
+                                range=[return_y_min, return_y_max]
                             )
                     
                     fig.update_layout(
