@@ -4,4 +4,4 @@ numpy==1.26.4
 plotly==5.24.1
 beautifulsoup4==4.12.3
 requests==2.32.3
-st-aggrid==0.3.4
+streamlit-aggrid==0.3.3
