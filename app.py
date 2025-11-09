@@ -495,6 +495,13 @@ def main():
                     return f'color: {color}'
                 return ''
 
+            # 예시: 표시할 DataFrame 생성 후
+            float_cols = [
+                '기준가', '최고가', '현재가',
+                '누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률',
+                '부채비율', '유동비율', 'ROE'
+            ]
+
             display_df = st.session_state['result_df'][display_columns].copy()
 
             # float 컬럼만 소수점 둘째자리로 반올림 (결측값/문자열은 그대로)
