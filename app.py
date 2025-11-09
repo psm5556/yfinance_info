@@ -557,31 +557,50 @@ def main():
                     lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x
                 )
 
-            # 테이블 표시
-            st.dataframe(
+            # 체크박스 컬럼 추가
+            display_df.insert(0, '선택', False)
+            
+            # 테이블 표시 (편집 가능)
+            edited_df = st.data_editor(
                 display_df.style.applymap(
                     highlight_returns,
                     subset=['누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률']
                 ),
                 use_container_width=True,
-                height=int(600 * SCALE)
+                height=int(600 * SCALE),
+                hide_index=True,
+                column_config={
+                    "선택": st.column_config.CheckboxColumn(
+                        "선택",
+                        help="차트를 보고 싶은 종목을 선택하세요",
+                        default=False,
+                    )
+                },
+                disabled=[col for col in display_df.columns if col != '선택'],
+                key='stock_table'
             )
 
-            # 개별 종목 차트 표시
-            st.markdown("---")
-            st.subheader("📈 개별 종목 상세 차트")
+            # 선택된 종목들 가져오기
+            selected_rows = edited_df[edited_df['선택'] == True]
             
-            selected_ticker = st.selectbox(
-                "종목 선택",
-                st.session_state['result_df']['티커'].tolist(),
-                format_func=lambda x: f"{x} - {st.session_state['result_df'][st.session_state['result_df']['티커'] == x]['기업명'].iloc[0]}"
-            )
-
-            selected_data = st.session_state['result_df'][
-                st.session_state['result_df']['티커'] == selected_ticker
-            ].iloc[0]
-            
-            display_stock_chart(selected_data)
+            if len(selected_rows) > 0:
+                st.markdown("---")
+                st.subheader(f"📈 선택된 종목 상세 차트 ({len(selected_rows)}개)")
+                
+                # 선택된 각 종목의 차트 표시
+                for idx, row in selected_rows.iterrows():
+                    selected_ticker = row['티커']
+                    selected_data = st.session_state['result_df'][
+                        st.session_state['result_df']['티커'] == selected_ticker
+                    ].iloc[0]
+                    
+                    display_stock_chart(selected_data)
+                    
+                    # 종목 간 구분선
+                    if idx < len(selected_rows) - 1:
+                        st.markdown("---")
+            else:
+                st.info("💡 차트를 보려면 테이블에서 종목의 체크박스를 선택하세요.")
 
         else:
             st.info("분석을 실행해주세요.")
