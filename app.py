@@ -677,7 +677,9 @@ def main():
                                          mode='lines',name="시장 전체 가중평균",
                                          line=dict(width=3,dash='dot',color='black')))
                 fig.update_layout(title="청팀 vs 백팀 누적수익률 비교 (가중평균 포함)",
-                                  height=500,hovermode='x unified')
+                                  height=500,hovermode='x unified',
+                                  legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                                 )
                 fig.add_hline(y=0,line_dash="dash",line_color="gray")
                 st.plotly_chart(fig,use_container_width=True)
             
