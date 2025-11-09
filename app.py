@@ -9,6 +9,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import json
 import time
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode  # ✅ 추가
 
 # 페이지 설정
 st.set_page_config(page_title="투자 포트폴리오 대시보드", layout="wide")
@@ -552,99 +553,50 @@ def main():
                 height=600
             )
             
-            # 차트 섹션
-            st.subheader("📈 개별 종목 차트")
-            
-            # 종목 선택
-            selected_ticker = st.selectbox(
-                "종목 선택",
-                result_df['티커'].tolist(),
-                format_func=lambda x: f"{x} - {result_df[result_df['티커']==x]['기업명'].iloc[0]}"
+            # ✅ 수정 부분: AgGrid로 대체
+            gb = GridOptionsBuilder.from_dataframe(result_df)
+            gb.configure_selection("single", use_checkbox=True)
+            grid_options = gb.build()
+
+            grid_response = AgGrid(
+                result_df,
+                gridOptions=grid_options,
+                update_mode=GridUpdateMode.SELECTION_CHANGED,
+                theme="streamlit",
+                height=400,
+                fit_columns_on_grid_load=True,
             )
-            
-            selected_data = result_df[result_df['티커'] == selected_ticker].iloc[0]
-            
-            if selected_data['price_data'] is not None:
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    st.metric("현재가", f"${selected_data['현재가']}", 
-                             f"{selected_data['일일수익률']}%")
-                
-                with col2:
-                    st.metric("누적수익률 (기준가)", 
-                             f"{selected_data['누적수익률(기준가)']}%")
-                
-                with col3:
-                    st.metric("누적수익률 (최고가)", 
-                             f"{selected_data['누적수익률(최고가)']}%")
-                
-                # 주가 트렌드
-                fig_price = go.Figure()
-                fig_price.add_trace(go.Scatter(
-                    x=selected_data['price_data'].index,
-                    y=selected_data['price_data']['Close'],
-                    mode='lines',
-                    name='주가',
-                    line=dict(color='#1f77b4', width=2)
-                ))
-                fig_price.update_layout(
-                    title="주가 트렌드",
-                    xaxis_title="날짜",
-                    yaxis_title="가격 ($)",
-                    height=400,
-                    hovermode='x unified'
-                )
-                st.plotly_chart(fig_price, use_container_width=True)
-                
-                # 변동률과 누적수익률 차트
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if selected_data['daily_changes'] is not None:
-                        changes = selected_data['daily_changes'].dropna()
-                        colors = ['green' if x >= 0 else 'red' for x in changes]
-                        
-                        fig_change = go.Figure()
-                        fig_change.add_trace(go.Bar(
-                            x=changes.index,
-                            y=changes.values,
-                            marker_color=colors,
-                            name='일일 변동률'
-                        ))
-                        fig_change.update_layout(
-                            title="변동률 트렌드",
-                            xaxis_title="날짜",
-                            yaxis_title="변동률 (%)",
-                            yaxis=dict(range=[change_y_min, change_y_max]),
-                            height=400,
-                            showlegend=False
+
+            selected_rows = grid_response["selected_rows"]
+
+            if selected_rows:
+                selected = selected_rows[0]
+                ticker = selected["티커"]
+                company = selected["기업명"]
+
+                st.markdown("---")
+                with st.container():
+                    st.markdown(f"### 📈 {company} ({ticker}) 상세 차트")
+                    stock_data = get_stock_data(ticker, start_date, end_date)
+                    if stock_data is not None:
+                        fig = go.Figure()
+                        fig.add_trace(
+                            go.Scatter(
+                                x=stock_data.index,
+                                y=stock_data["Close"],
+                                mode="lines",
+                                line=dict(color="#1f77b4", width=2),
+                                name="주가"
+                            )
                         )
-                        fig_change.add_hline(y=0, line_dash="dash", line_color="gray")
-                        st.plotly_chart(fig_change, use_container_width=True)
-                
-                with col2:
-                    if selected_data['cumulative_returns'] is not None:
-                        returns = selected_data['cumulative_returns'].dropna()
-                        colors = ['green' if x >= 0 else 'red' for x in returns]
-                        
-                        fig_return = go.Figure()
-                        fig_return.add_trace(go.Bar(
-                            x=returns.index,
-                            y=returns.values,
-                            marker_color=colors,
-                            name='누적 수익률'
-                        ))
-                        fig_return.update_layout(
-                            title="누적 수익률 트렌드",
-                            xaxis_title="날짜",
-                            yaxis_title="누적 수익률 (%)",
-                            yaxis=dict(range=[return_y_min, return_y_max]),
+                        fig.update_layout(
+                            title=f"{company} ({ticker}) 주가 트렌드",
                             height=400,
-                            showlegend=False
+                            hovermode="x unified"
                         )
-                        fig_return.add_hline(y=0, line_dash="dash", line_color="gray")
-                        st.plotly_chart(fig_return, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.warning("❌ 해당 종목의 주가 데이터를 가져올 수 없습니다.")
             
             # 세션 상태에 저장
             st.session_state['results'] = results
