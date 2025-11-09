@@ -201,51 +201,122 @@ def load_portfolio_data():
     df = pd.read_csv(StringIO(data))
     return df
 
-# Finviz 데이터 가져오기
+
+# Finviz 데이터 가져오기 (개선된 버전)
 @st.cache_data(ttl=86400)
 def get_finviz_metric(ticker, metric_name):
     try:
         url = f"https://finviz.com/quote.ashx?t={ticker}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=100)
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        tables = soup.find_all('table', {'class': 'snapshot-table2'})
-        if not tables:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0'
+        }
+        
+        session = requests.Session()
+        response = session.get(url, headers=headers, timeout=15, allow_redirects=True)
+        
+        if response.status_code != 200:
+            print(f"[WARNING] {ticker} HTTP {response.status_code}")
             return "-"
-
+        
+        time.sleep(0.5)  # Rate limiting
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 방법 1: snapshot-table2 클래스 테이블 찾기
+        tables = soup.find_all('table', {'class': 'snapshot-table2'})
+        
         for table in tables:
             rows = table.find_all('tr')
             for row in rows:
                 cells = row.find_all('td')
                 for i in range(0, len(cells) - 1, 2):
-                    if cells[i].text.strip() == metric_name:
-                        value = cells[i + 1].text.strip()
-                        if value == '-':
+                    label = cells[i].get_text(strip=True)
+                    if label == metric_name:
+                        value = cells[i + 1].get_text(strip=True)
+                        if value == '-' or value == '':
                             return "-"
-                        value = value.replace('%', '').replace(',', '')
+                        # 숫자 변환
+                        value = value.replace('%', '').replace(',', '').replace('B', '').replace('M', '')
                         try:
                             return float(value)
                         except:
                             return value
+        
+        # 방법 2: 모든 td 태그에서 찾기 (백업)
+        all_tds = soup.find_all('td')
+        for i in range(len(all_tds) - 1):
+            if all_tds[i].get_text(strip=True) == metric_name:
+                value = all_tds[i + 1].get_text(strip=True)
+                if value == '-' or value == '':
+                    return "-"
+                value = value.replace('%', '').replace(',', '').replace('B', '').replace('M', '')
+                try:
+                    return float(value)
+                except:
+                    return value
+        
+        return "-"
+        
+    except requests.exceptions.Timeout:
+        print(f"[WARNING] {ticker} Timeout")
         return "-"
     except Exception as e:
+        print(f"[WARNING] {ticker} {metric_name} 조회 실패: {e}")
         return "-"
 
-# Finviz API 데이터 가져오기
+# Finviz API에서 재무제표 데이터 가져오기
 @st.cache_data(ttl=86400)
 def get_finviz_data(ticker, statement, item):
     try:
         statement_map = {"IS": "IQ", "BS": "BQ", "CF": "CQ"}
         url = f"https://finviz.com/api/statement.ashx?t={ticker}&so=F&s={statement_map[statement]}"
-        response = requests.get(url, timeout=100)
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': f'https://finviz.com/quote.ashx?t={ticker}',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        
+        session = requests.Session()
+        response = session.get(url, headers=headers, timeout=15)
+        
+        if response.status_code != 200:
+            print(f"[WARNING] {ticker} API HTTP {response.status_code}")
+            return None
+        
+        time.sleep(0.5)  # Rate limiting
+        
         data = response.json()
 
         if data and 'data' in data and item in data['data']:
-            value = data['data'][item][0]
-            return float(value) if value != '-' else None
+            values = data['data'][item]
+            if values and len(values) > 0:
+                value = values[0]
+                if value == '-' or value is None:
+                    return None
+                try:
+                    return float(value)
+                except:
+                    return None
+        
         return None
-    except:
+        
+    except requests.exceptions.Timeout:
+        print(f"[WARNING] {ticker} API Timeout")
+        return None
+    except Exception as e:
+        print(f"[WARNING] {ticker} API 조회 실패: {e}")
         return None
 
 # 주가 데이터 가져오기 (Yahoo Finance Chart API - Google Apps Script 방식)
@@ -461,12 +532,26 @@ def main():
                         daily_changes = stock_data['Close'].pct_change() * 100
                         cumulative_returns = ((stock_data['Close'] / base_price) - 1) * 100
 
-                        debt_ratio = get_finviz_metric(ticker, "Debt/Eq")
-                        current_ratio = get_finviz_metric(ticker, "Current Ratio")
-                        roe = get_finviz_metric(ticker, "ROE")
-
-                        total_cash = get_finviz_data(ticker, "BS", "Cash & Short Term Investments")
-                        free_cash_flow = get_finviz_data(ticker, "CF", "Free Cash Flow")
+                        # yfinance에서 재무 데이터 가져오기 (주요 소스)
+                        financial_data = get_yfinance_financial_data(ticker)
+                        
+                        debt_ratio = financial_data['debt_ratio']
+                        current_ratio = financial_data['current_ratio']
+                        roe = financial_data['roe']
+                        total_cash = financial_data['total_cash']
+                        free_cash_flow = financial_data['free_cash_flow']
+                        
+                        # yfinance에서 데이터를 못 가져온 경우에만 Finviz 시도 (백업)
+                        if debt_ratio is None:
+                            debt_ratio = get_finviz_metric(ticker, "Debt/Eq")
+                        if current_ratio is None:
+                            current_ratio = get_finviz_metric(ticker, "Current Ratio")
+                        if roe is None:
+                            roe = get_finviz_metric(ticker, "ROE")
+                        if total_cash is None:
+                            total_cash = get_finviz_data(ticker, "BS", "Cash & Short Term Investments")
+                        if free_cash_flow is None:
+                            free_cash_flow = get_finviz_data(ticker, "CF", "Free Cash Flow")
 
                         runway = "-"
                         if total_cash and free_cash_flow and free_cash_flow < 0:
