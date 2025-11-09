@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import requests
 from bs4 import BeautifulSoup
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
 import json
 import time
@@ -45,29 +46,33 @@ def get_finviz_metric_cached(ticker, metric_name):
         if not tables:
             return "-"
         for table in tables:
-            for row in table.find_all('tr'):
+            rows = table.find_all('tr')
+            for row in rows:
                 cells = row.find_all('td')
                 for i in range(0, len(cells)-1, 2):
                     if cells[i].text.strip() == metric_name:
-                        val = cells[i+1].text.strip().replace('%','').replace(',','')
+                        value = cells[i+1].text.strip()
+                        if value == '-':
+                            return "-"
+                        value = value.replace('%', '').replace(',', '')
                         try:
-                            return float(val)
+                            return float(value)
                         except:
-                            return val
+                            return value
         return "-"
-    except:
+    except Exception:
         return "-"
 
 @st.cache_data(ttl=86400)
 def get_finviz_data_cached(ticker, statement, item):
     try:
-        map_ = {"IS": "IQ", "BS": "BQ", "CF": "CQ"}
-        url = f"https://finviz.com/api/statement.ashx?t={ticker}&so=F&s={map_[statement]}"
-        res = requests.get(url, timeout=10)
-        data = res.json()
+        statement_map = {"IS": "IQ", "BS": "BQ", "CF": "CQ"}
+        url = f"https://finviz.com/api/statement.ashx?t={ticker}&so=F&s={statement_map[statement]}"
+        response = requests.get(url, timeout=10)
+        data = response.json()
         if data and 'data' in data and item in data['data']:
-            v = data['data'][item][0]
-            return float(v) if v != '-' else None
+            value = data['data'][item][0]
+            return float(value) if value != '-' else None
         return None
     except:
         return None
@@ -100,137 +105,160 @@ def get_stock_data(ticker, start_date, end_date):
         return None
 
 # -------------------------------------------------------
+# 미니 차트 생성 (기존 유지)
+# -------------------------------------------------------
+def create_mini_chart(data, chart_type='line'):
+    if data is None or len(data) == 0:
+        return None
+    fig = go.Figure()
+    if chart_type == 'line':
+        fig.add_trace(go.Scatter(
+            x=data.index, y=data['Close'], mode='lines',
+            line=dict(width=1, color='#1f77b4'), showlegend=False
+        ))
+    elif chart_type == 'bar':
+        colors = ['green' if x >= 0 else 'red' for x in data]
+        fig.add_trace(go.Bar(x=list(range(len(data))), y=data, marker_color=colors, showlegend=False))
+    fig.update_layout(
+        height=50, margin=dict(l=0, r=0, t=0, b=0),
+        xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+        yaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)'
+    )
+    return fig
+
+# -------------------------------------------------------
 # 메인 앱
 # -------------------------------------------------------
 def main():
     st.title("📊 투자 포트폴리오 대시보드")
-
     st.sidebar.header("⚙️ 설정")
-    start_date = st.sidebar.date_input("시작일", datetime(2025,10,1))
-    end_date = st.sidebar.date_input("종료일", datetime.now())
-    analyze = st.sidebar.button("🔍 분석 시작", type="primary")
 
-    df_port = load_portfolio_data()
+    default_start = datetime(2025,10,9)
+    default_end = datetime.now()
+    start_date = st.sidebar.date_input("시작일", default_start)
+    end_date = st.sidebar.date_input("종료일", default_end)
+
+    st.sidebar.subheader("차트 Y축 범위")
+    change_y_min = st.sidebar.number_input("변동율 Y축 최소값", value=-10)
+    change_y_max = st.sidebar.number_input("변동율 Y축 최대값", value=10)
+    return_y_min = st.sidebar.number_input("누적수익율 Y축 최소값", value=-50)
+    return_y_max = st.sidebar.number_input("누적수익율 Y축 최대값", value=50)
+
+    analyze_button = st.sidebar.button("🔍 분석 시작", type="primary", use_container_width=True)
+    portfolio_df = load_portfolio_data()
     tab1, tab2 = st.tabs(["📈 포트폴리오 분석", "📊 트렌드 분석"])
 
-    # ---------------- 포트폴리오 분석 ----------------
+    # ------------------ 포트폴리오 분석 ------------------
     with tab1:
-        if analyze:
-            st.info("데이터를 수집 중입니다. 잠시만 기다려주세요.")
-            results = []
-            prog = st.progress(0)
-
-            for i, row in df_port.iterrows():
-                ticker = row['티커']
-                prog.progress((i+1)/len(df_port))
-                data = get_stock_data(ticker, start_date, end_date)
-                if data is None or data.empty:
-                    continue
-                base, curr = data['Close'].iloc[0], data['Close'].iloc[-1]
-                highest = data['Close'].max()
-                cum = ((data['Close']/base)-1)*100
-                debt = get_finviz_metric_cached(ticker, "Debt/Eq")
-                curr_ratio = get_finviz_metric_cached(ticker, "Current Ratio")
-                roe = get_finviz_metric_cached(ticker, "ROE")
-                cash = get_finviz_data_cached(ticker, "BS", "Cash & Short Term Investments")
-                fcf = get_finviz_data_cached(ticker, "CF", "Free Cash Flow")
-                runway = round(cash/abs(fcf),1) if cash and fcf and fcf<0 else "-"
-                results.append({
-                    '팀':row['팀'],'섹터':row['섹터'],'기업명':row['기업명'],'티커':ticker,
-                    '기준가':round(base,2),'현재가':round(curr,2),'최고가':round(highest,2),
-                    '누적수익률(기준가)':round(((curr-base)/base)*100,2),
-                    '누적수익률(최고가)':round(((curr-highest)/highest)*100,2),
-                    'ROE':roe,'부채비율':debt,'유동비율':curr_ratio,
-                    'Runway(년)':runway,'Total Cash(M$)':cash,'FCF(M$)':fcf,
-                    'price_data':data,'cumulative_returns':cum
-                })
-            st.session_state['result_df'] = pd.DataFrame(results)
+        if analyze_button:
+            st.info("데이터를 가져오는 중입니다...")
+            results=[]
+            prog=st.progress(0)
+            for i,row in portfolio_df.iterrows():
+                ticker=row['티커']
+                prog.progress((i+1)/len(portfolio_df))
+                data=get_stock_data(ticker,start_date,end_date)
+                if data is not None and len(data)>0:
+                    base=data['Close'].iloc[0]
+                    curr=data['Close'].iloc[-1]
+                    high=data['Close'].max()
+                    daily_changes=data['Close'].pct_change()*100
+                    cumulative=((data['Close']/base)-1)*100
+                    debt=get_finviz_metric_cached(ticker,"Debt/Eq")
+                    curr_ratio=get_finviz_metric_cached(ticker,"Current Ratio")
+                    roe=get_finviz_metric_cached(ticker,"ROE")
+                    cash=get_finviz_data_cached(ticker,"BS","Cash & Short Term Investments")
+                    fcf=get_finviz_data_cached(ticker,"CF","Free Cash Flow")
+                    runway="-"
+                    if cash and fcf and fcf<0:
+                        runway=round(cash/abs(fcf),1)
+                    results.append({
+                        '팀':row['팀'],'자산':row['자산'],'섹터':row['섹터'],'기업명':row['기업명'],'티커':ticker,
+                        '기준가':round(base,2),'최고가':round(high,2),'현재가':round(curr,2),
+                        '누적수익률(기준가)':round(((curr-base)/base)*100,2),
+                        '누적수익률(최고가)':round(((curr-high)/high)*100,2),
+                        '부채비율':debt,'유동비율':curr_ratio,'ROE':roe,
+                        'Runway(년)':runway,
+                        'Total Cash(M$)':round(cash,2) if cash else "-",
+                        'FCF(M$)':round(fcf,2) if fcf else "-",
+                        'price_data':data,
+                        'daily_changes':daily_changes[1:],
+                        'cumulative_returns':cumulative
+                    })
+            prog.empty()
             st.success("✅ 분석 완료!")
+            result_df=pd.DataFrame(results)
+            st.session_state['results']=results
+            st.session_state['result_df']=result_df
+            st.subheader("📋 포트폴리오 상세 분석")
+            st.dataframe(result_df,use_container_width=True,height=600)
 
-            st.subheader("📋 포트폴리오 결과 요약")
-            disp = st.session_state['result_df'].copy()
-            st.dataframe(disp,use_container_width=True)
-
-    # ---------------- 트렌드 분석 ----------------
+    # ------------------ 트렌드 분석 ------------------
     with tab2:
         if 'result_df' not in st.session_state:
             st.info("먼저 '포트폴리오 분석' 탭에서 분석을 실행해주세요.")
             return
-
-        result_df = st.session_state['result_df']
+        result_df=st.session_state['result_df']
         st.subheader("📊 트렌드 분석")
 
-        # 팀별 평균 변동률 트렌드
+        # 1️⃣ 팀별 평균 변동률
         st.markdown("### 1️⃣ 팀별 평균 변동률 트렌드")
-        team_data = {}
-        for team in result_df['팀'].unique():
-            changes = []
-            for _, row in result_df[result_df['팀']==team].iterrows():
-                if row['cumulative_returns'] is not None:
-                    changes.append(row['cumulative_returns'].pct_change().dropna()*100)
-            if changes:
-                combined = pd.concat(changes,axis=1).mean(axis=1)
-                team_data[team]=combined
+        team_data={}
+        for t in result_df['팀'].unique():
+            arr=[r['daily_changes'].dropna() for _,r in result_df[result_df['팀']==t].iterrows() if r['daily_changes'] is not None]
+            if arr:
+                team_data[t]=pd.concat(arr,axis=1).mean(axis=1)
         if team_data:
-            fig_team = go.Figure()
+            fig_team=go.Figure()
             for t,d in team_data.items():
                 fig_team.add_trace(go.Scatter(x=d.index,y=d.values,mode='lines',name=t))
-            fig_team.update_layout(title="팀별 평균 변동률",height=400)
+            fig_team.update_layout(title="팀별 평균 변동률",height=500)
             st.plotly_chart(fig_team,use_container_width=True)
 
-        # 섹터별 평균 변동률
+        # 2️⃣ 섹터별 평균 변동률
         st.markdown("### 2️⃣ 섹터별 평균 변동률 트렌드")
         sector_data={}
         for s in result_df['섹터'].unique():
-            arr=[]
-            for _,r in result_df[result_df['섹터']==s].iterrows():
-                if r['cumulative_returns'] is not None:
-                    arr.append(r['cumulative_returns'].pct_change().dropna()*100)
+            arr=[r['daily_changes'].dropna() for _,r in result_df[result_df['섹터']==s].iterrows() if r['daily_changes'] is not None]
             if arr:
                 sector_data[s]=pd.concat(arr,axis=1).mean(axis=1)
         if sector_data:
             fig_sector=go.Figure()
             for s,d in sector_data.items():
                 fig_sector.add_trace(go.Scatter(x=d.index,y=d.values,mode='lines',name=s))
-            fig_sector.update_layout(title="섹터별 평균 변동률",height=400)
+            fig_sector.update_layout(title="섹터별 평균 변동률",height=500)
             st.plotly_chart(fig_sector,use_container_width=True)
 
-        # 섹터별 개별 종목 변동률
+        # 3️⃣ 섹터별 개별 종목 변동률
         st.markdown("### 3️⃣ 섹터별 개별 종목 변동률")
         for sector in result_df['섹터'].unique():
             with st.expander(f"📂 {sector}"):
-                sector_df = result_df[result_df['섹터']==sector]
-                n=len(sector_df)
+                sec=result_df[result_df['섹터']==sector]
+                n=len(sec)
                 rows=(n+2)//3
                 fig=make_subplots(rows=rows,cols=3,
-                    subplot_titles=[f"{r['티커']}" for _,r in sector_df.iterrows()],
+                    subplot_titles=[f"{r['티커']}" for _,r in sec.iterrows()],
                     vertical_spacing=0.1,horizontal_spacing=0.05)
-                for idx,(_,r) in enumerate(sector_df.iterrows()):
-                    if r['cumulative_returns'] is not None:
-                        ch=r['cumulative_returns'].pct_change().dropna()*100
-                        row,col=(idx//3)+1,(idx%3)+1
+                for i,(_,r) in enumerate(sec.iterrows()):
+                    if r['daily_changes'] is not None:
+                        ch=r['daily_changes'].dropna()
+                        row,col=(i//3)+1,(i%3)+1
                         fig.add_trace(go.Bar(x=ch.index,y=ch.values,showlegend=False),row=row,col=col)
                 fig.update_layout(height=300*rows,title=f"{sector} 섹터 변동률")
                 st.plotly_chart(fig,use_container_width=True)
 
-        # ✅ 청팀 vs 백팀 누적수익률 비교 (가중평균 포함)
+        # ✅ 4️⃣ 청팀 vs 백팀 누적수익률 비교 (가중평균 포함)
         st.markdown("### 4️⃣ 청팀 vs 백팀 누적수익률 비교 (가중평균 포함)")
         team_returns={}
         for team in result_df['팀'].unique():
-            team_stocks=result_df[result_df['팀']==team]
-            arr=[]
-            for _,r in team_stocks.iterrows():
-                if r['cumulative_returns'] is not None:
-                    arr.append(r['cumulative_returns'].dropna())
+            stocks=result_df[result_df['팀']==team]
+            arr=[r['cumulative_returns'].dropna() for _,r in stocks.iterrows() if r['cumulative_returns'] is not None]
             if arr:
                 team_returns[team]=pd.concat(arr,axis=1).mean(axis=1)
-
         if team_returns:
             total=sum(len(result_df[result_df['팀']==t]) for t in team_returns.keys())
-            weighted={}
-            for t,d in team_returns.items():
-                w=len(result_df[result_df['팀']==t])/total
-                weighted[t]=d*w
+            weighted={t:d*(len(result_df[result_df['팀']==t])/total) for t,d in team_returns.items()}
             total_weighted=sum(weighted.values())
 
             fig=go.Figure()
