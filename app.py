@@ -469,30 +469,32 @@ def get_stock_data_with_ma(ticker, interval="1d"):
         # 이동평균선 계산
         for ma_period in ma_periods:
             df[f"MA{ma_period}"] = df["Close"].rolling(ma_period).mean()
+        df.dropna(inplace=True)
+
+        df_display = df
+        # # NaN 제거 전 충분한 데이터가 있는지 확인
+        # if len(df) < max(ma_periods):
+        #     # 데이터가 부족하면 최소한의 이동평균선만 계산
+        #     return None
         
-        # NaN 제거 전 충분한 데이터가 있는지 확인
-        if len(df) < max(ma_periods):
-            # 데이터가 부족하면 최소한의 이동평균선만 계산
-            return None
+        # # 최근 1년 6개월 데이터만 표시 (하지만 이동평균선은 전체 데이터로 계산됨)
+        # if interval == "1d":
+        #     lookback = min(display_days, len(df))
+        # else:  # 1wk
+        #     lookback = min(display_weeks, len(df))
         
-        # 최근 1년 6개월 데이터만 표시 (하지만 이동평균선은 전체 데이터로 계산됨)
-        if interval == "1d":
-            lookback = min(display_days, len(df))
-        else:  # 1wk
-            lookback = min(display_weeks, len(df))
+        # # 이동평균선 값이 있는 데이터만 필터링
+        # df_display = df.iloc[-lookback:].copy()
         
-        # 이동평균선 값이 있는 데이터만 필터링
-        df_display = df.iloc[-lookback:].copy()
+        # # 최소한 하나의 이동평균선이라도 있는지 확인
+        # has_ma = False
+        # for ma_period in ma_periods:
+        #     if not df_display[f"MA{ma_period}"].isna().all():
+        #         has_ma = True
+        #         break
         
-        # 최소한 하나의 이동평균선이라도 있는지 확인
-        has_ma = False
-        for ma_period in ma_periods:
-            if not df_display[f"MA{ma_period}"].isna().all():
-                has_ma = True
-                break
-        
-        if not has_ma:
-            return None
+        # if not has_ma:
+        #     return None
         
         return df_display if not df_display.empty else None
         
