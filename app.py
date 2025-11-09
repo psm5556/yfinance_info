@@ -278,6 +278,14 @@ def get_finviz_metric(ticker, metric_name):
 def get_finviz_data(ticker, statement, item):
     try:
         statement_map = {"IS": "IQ", "BS": "BQ", "CF": "CQ"}
+        statement_map = {
+                      "ISQ": "IQ",  # Income Statement Quarterly
+                      "BSQ": "BQ",  # Balance Sheet Quarterly
+                      "CFQ": "CQ",  # Cash Flow Quarterly
+                      "ISA": "IA",  # Income Statement Annual
+                      "BSA": "BA",  # Balance Sheet Annual
+                      "CFA": "CA"   # Cash Flow Annual
+                    }
         url = f"https://finviz.com/api/statement.ashx?t={ticker}&so=F&s={statement_map[statement]}"
         
         headers = {
@@ -536,8 +544,8 @@ def main():
                         debt_ratio = get_finviz_metric(ticker, "Debt/Eq")
                         current_ratio = get_finviz_metric(ticker, "Current Ratio")
                         roe = get_finviz_metric(ticker, "ROE")
-                        total_cash = get_finviz_data(ticker, "BS", "Cash & Short Term Investments")
-                        free_cash_flow = get_finviz_data(ticker, "CF", "Free Cash Flow")
+                        total_cash = get_finviz_data(ticker, "BSQ", "Cash & Short Term Investments")
+                        free_cash_flow = get_finviz_data(ticker, "CFA", "Free Cash Flow")
 
                         runway = "-"
                         if total_cash and free_cash_flow and free_cash_flow < 0:
