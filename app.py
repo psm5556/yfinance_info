@@ -887,24 +887,6 @@ def main():
                 key='stock_table'
             )
 
-            # 티커까지 고정
-            st.markdown("""
-            <style>
-            [data-testid="stDataFrame"] table th:first-child,
-            [data-testid="stDataFrame"] table th:nth-child(2),
-            [data-testid="stDataFrame"] table th:nth-child(3),
-            [data-testid="stDataFrame"] table th:nth-child(4),
-            [data-testid="stDataFrame"] table th:nth-child(5),
-            [data-testid="stDataFrame"] table th:nth-child(6),
-            [data-testid="stDataFrame"] table th:nth-child(7) {
-                position: sticky;
-                left: 0;
-                background-color: white;
-                z-index: 1;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-
             # 선택된 종목 확인
             selected_rows = edited_df[edited_df['선택'] == True]
             
