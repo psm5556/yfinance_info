@@ -497,6 +497,11 @@ def main():
 
             display_df = st.session_state['result_df'][display_columns].copy()
 
+            # float 컬럼만 소수점 둘째자리로 반올림 (결측값/문자열은 그대로)
+            for col in float_cols:
+                display_df[col] = pd.to_numeric(display_df[col], errors='coerce').round(2).astype('float').map(lambda x: '-' if pd.isna(x) else x)
+
+
             st.dataframe(
                 display_df.style.applymap(
                     highlight_returns,
