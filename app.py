@@ -391,7 +391,7 @@ def main():
     st.title("📊 투자 포트폴리오 대시보드")
     
     # 사이드바
-    st.sidebar.header(⚙️ 설정")
+    st.sidebar.header("⚙️ 설정")
     
     # 기본 날짜 설정
     default_start = datetime(2025, 10, 9)
