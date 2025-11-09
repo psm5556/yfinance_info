@@ -495,6 +495,8 @@ def main():
                     return f'color: {color}'
                 return ''
 
+            display_df = st.session_state['result_df'][display_columns].copy()
+
             # 예시: 표시할 DataFrame 생성 후
             float_cols = [
                 '기준가', '최고가', '현재가',
@@ -502,21 +504,29 @@ def main():
                 '부채비율', '유동비율', 'ROE'
             ]
 
-            display_df = st.session_state['result_df'][display_columns].copy()
-
             # float 컬럼만 소수점 둘째자리로 반올림 (결측값/문자열은 그대로)
             for col in float_cols:
                 display_df[col] = pd.to_numeric(display_df[col], errors='coerce').round(2).astype('float').map(lambda x: '-' if pd.isna(x) else x)
 
+            # 각 컬럼별 포맷 함수 생성
+            fmt_dict = {col: "{:.2f}".format for col in float_cols}
 
             st.dataframe(
-                display_df.style.applymap(
-                    highlight_returns,
-                    subset=['누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률']
-                ),
+                display_df.style
+                    .format(fmt_dict, na_rep="-")
+                    .applymap(highlight_returns, subset=['누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률']),
                 use_container_width=True,
                 height=int(600 * SCALE)
             )
+
+            # st.dataframe(
+            #     display_df.style.applymap(
+            #         highlight_returns,
+            #         subset=['누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률']
+            #     ),
+            #     use_container_width=True,
+            #     height=int(600 * SCALE)
+            # )
 
             st.subheader("📈 개별 종목 차트")
 
