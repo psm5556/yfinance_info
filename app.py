@@ -9,6 +9,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import json
 import time
+import yfinance as yf
 
 # 크기 조정 상수
 SCALE = 0.75
@@ -233,7 +234,7 @@ def get_finviz_metric(ticker, metric_name):
             print(f"[WARNING] {ticker} HTTP {response.status_code}")
             return "-"
         
-        time.sleep(0.1)  # Rate limiting
+        time.sleep(0.5)  # Rate limiting
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -337,7 +338,7 @@ def get_finviz_data(ticker, statement, item):
             print(f"[WARNING] {ticker} API HTTP {response.status_code}")
             return None
         
-        time.sleep(0.1)  # Rate limiting
+        time.sleep(0.5)  # Rate limiting
         
         data = response.json()
 
@@ -436,8 +437,47 @@ def get_stock_data(ticker, start_date, end_date):
         print(f"Error fetching data for {ticker}: {e}")
         return None
 
+# 이동평균선이 포함된 주가 데이터 가져오기 (최근 1년 6개월)
+@st.cache_data(ttl=3600)
+def get_stock_data_with_ma(ticker, interval="1d"):
+    """최근 1년 6개월 데이터를 가져오고 이동평균선 계산"""
+    try:
+        import yfinance as yf
+        
+        # 기간 설정
+        period = "2y"  # 이동평균선 계산을 위해 2년치 가져옴
+        
+        yf_ticker = yf.Ticker(ticker)
+        df = yf_ticker.history(period=period, interval=interval)
+        
+        if df is None or df.empty:
+            return None
+        
+        df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
+        
+        # 이동평균선 계산
+        df["MA200"] = df["Close"].rolling(200).mean()
+        df["MA240"] = df["Close"].rolling(240).mean()
+        df["MA365"] = df["Close"].rolling(365).mean()
+        
+        # 최근 1년 6개월 데이터만 반환 (약 547일 또는 78주)
+        if interval == "1d":
+            lookback = min(547, len(df))
+        else:  # 1wk
+            lookback = min(78, len(df))
+            
+        df = df.iloc[-lookback:]
+        df.dropna(subset=["MA200", "MA240", "MA365"], inplace=True)
+        
+        return df if not df.empty else None
+        
+    except Exception as e:
+        print(f"Error fetching data with MA for {ticker}: {e}")
+        return None
+
+
 # 개별 종목 차트 표시 함수
-def display_stock_chart(selected_data):
+def display_stock_chart(selected_data, start_date):
     """선택된 종목의 상세 차트를 표시"""
     if selected_data['price_data'] is not None:
         st.markdown("---")
@@ -457,23 +497,95 @@ def display_stock_chart(selected_data):
         with col4:
             st.metric("섹터", selected_data['섹터'])
 
-        fig_price = go.Figure()
-        fig_price.add_trace(go.Scatter(
-            x=selected_data['price_data'].index,
-            y=selected_data['price_data']['Close'],
-            mode='lines',
-            name='주가',
-            line=dict(color='#1f77b4', width=max(int(2 * SCALE), 1))
-        ))
-        fig_price.update_layout(
-            title="주가 트렌드",
-            xaxis_title="날짜",
-            yaxis_title="가격 ($)",
-            height=int(400 * SCALE),
-            hovermode='x unified'
+        # 차트 주기 선택
+        chart_interval = st.radio(
+            "차트 주기",
+            ["일봉 (1d)", "주봉 (1wk)"],
+            horizontal=True,
+            key=f"interval_{selected_data['티커']}"
         )
-        st.plotly_chart(fig_price, use_container_width=True)
+        
+        interval = "1d" if "일봉" in chart_interval else "1wk"
+        
+        # 이동평균선이 포함된 데이터 가져오기
+        df_chart = get_stock_data_with_ma(selected_data['티커'], interval)
+        
+        if df_chart is not None and not df_chart.empty:
+            # 캔들스틱 차트 생성
+            fig_price = go.Figure()
+            
+            # 박스 줌 활성화
+            fig_price.update_layout(
+                dragmode="zoom",
+                xaxis_rangeslider_visible=False
+            )
+            
+            # 캔들스틱 추가
+            fig_price.add_trace(go.Candlestick(
+                x=df_chart.index,
+                open=df_chart["Open"],
+                high=df_chart["High"],
+                low=df_chart["Low"],
+                close=df_chart["Close"],
+                name="주가"
+            ))
+            
+            # 이동평균선 추가
+            ma_colors = {
+                "MA200": "#7752fe",
+                "MA240": "#f97316",
+                "MA365": "#6b7280"
+            }
+            
+            for ma_name, color in ma_colors.items():
+                if ma_name in df_chart.columns:
+                    fig_price.add_trace(go.Scatter(
+                        x=df_chart.index,
+                        y=df_chart[ma_name],
+                        mode="lines",
+                        name=ma_name,
+                        line=dict(width=2, color=color)
+                    ))
+            
+            # 시작일 세로선 추가
+            if start_date:
+                # start_date를 datetime으로 변환
+                if isinstance(start_date, str):
+                    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                else:
+                    start_dt = datetime.combine(start_date, datetime.min.time())
+                
+                # 차트 데이터 범위 내에 있는지 확인
+                if df_chart.index[0] <= start_dt <= df_chart.index[-1]:
+                    fig_price.add_vline(
+                        x=start_dt,
+                        line_dash="dash",
+                        line_color="red",
+                        annotation_text="시작일",
+                        annotation_position="top"
+                    )
+            
+            fig_price.update_layout(
+                title=f"주가 트렌드 ({chart_interval})",
+                xaxis_title="날짜",
+                yaxis_title="가격 ($)",
+                height=int(500 * SCALE),
+                hovermode='x unified',
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                )
+            )
+            
+            st.plotly_chart(fig_price, use_container_width=True)
+        else:
+            st.warning("차트 데이터를 불러올 수 없습니다.")
 
+        # 기존 변동률 및 누적수익률 차트 유지
         col1, col2 = st.columns(2)
 
         with col1:
@@ -496,6 +608,21 @@ def display_stock_chart(selected_data):
                     showlegend=False
                 )
                 fig_change.add_hline(y=0, line_dash="dash", line_color="gray")
+                
+                # 시작일 세로선 추가
+                if start_date:
+                    if isinstance(start_date, str):
+                        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                    else:
+                        start_dt = datetime.combine(start_date, datetime.min.time())
+                    
+                    if changes.index[0] <= start_dt <= changes.index[-1]:
+                        fig_change.add_vline(
+                            x=start_dt,
+                            line_dash="dash",
+                            line_color="red"
+                        )
+                
                 st.plotly_chart(fig_change, use_container_width=True)
 
         with col2:
@@ -518,6 +645,21 @@ def display_stock_chart(selected_data):
                     showlegend=False
                 )
                 fig_return.add_hline(y=0, line_dash="dash", line_color="gray")
+                
+                # 시작일 세로선 추가
+                if start_date:
+                    if isinstance(start_date, str):
+                        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                    else:
+                        start_dt = datetime.combine(start_date, datetime.min.time())
+                    
+                    if returns.index[0] <= start_dt <= returns.index[-1]:
+                        fig_return.add_vline(
+                            x=start_dt,
+                            line_dash="dash",
+                            line_color="red"
+                        )
+                
                 st.plotly_chart(fig_return, use_container_width=True)
 
 # 메인 앱
@@ -744,7 +886,7 @@ def main():
                     st.session_state['result_df']['티커'] == selected_ticker
                 ].iloc[0]
                 
-                display_stock_chart(selected_data)
+                display_stock_chart(selected_data, start_date)
             elif len(selected_rows) == 0:
                 st.info("💡 차트를 보려면 테이블에서 종목의 체크박스를 선택하세요.")
 
