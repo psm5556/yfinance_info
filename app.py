@@ -560,8 +560,14 @@ def main():
             # 번호 컬럼 추가
             display_df.insert(0, '번호', range(1, len(display_df) + 1))
             
-            # 단일 선택을 위한 라디오 버튼 컬럼 추가
+            # 단일 선택을 위한 체크박스 컬럼 추가
             display_df.insert(1, '선택', False)
+            
+            # 이전 선택 상태 복원 (session_state에 저장)
+            if 'selected_ticker' in st.session_state and st.session_state.selected_ticker:
+                ticker_idx = display_df[display_df['티커'] == st.session_state.selected_ticker].index
+                if len(ticker_idx) > 0:
+                    display_df.loc[ticker_idx[0], '선택'] = True
             
             # 테이블 표시 (편집 가능)
             edited_df = st.data_editor(
@@ -586,18 +592,39 @@ def main():
                 key='stock_table'
             )
 
-            # 선택된 종목 가져오기 (단일 선택만 허용)
+            # 선택된 종목 확인
             selected_rows = edited_df[edited_df['선택'] == True]
             
+            # 단일 선택 로직 처리
             if len(selected_rows) > 1:
-                st.warning("⚠️ 한 번에 하나의 종목만 선택해주세요. 가장 최근 선택이 적용됩니다.")
-                selected_row = selected_rows.iloc[-1]
+                # 여러 개 선택된 경우, 가장 최근 선택만 유지
+                # 이전 선택과 비교하여 새로 선택된 것만 남김
+                prev_selected = st.session_state.get('selected_ticker', None)
+                new_selected = None
+                
+                for idx, row in selected_rows.iterrows():
+                    if row['티커'] != prev_selected:
+                        new_selected = row['티커']
+                        break
+                
+                if new_selected is None:
+                    new_selected = selected_rows.iloc[-1]['티커']
+                
+                st.session_state.selected_ticker = new_selected
+                st.rerun()
+                
             elif len(selected_rows) == 1:
+                # 단일 선택된 경우
+                st.session_state.selected_ticker = selected_rows.iloc[0]['티커']
                 selected_row = selected_rows.iloc[0]
             else:
+                # 선택 해제된 경우
+                if 'selected_ticker' in st.session_state:
+                    del st.session_state.selected_ticker
                 selected_row = None
             
-            if selected_row is not None:
+            # 차트 표시
+            if len(selected_rows) == 1:
                 st.markdown("---")
                 selected_ticker = selected_row['티커']
                 selected_data = st.session_state['result_df'][
@@ -605,7 +632,7 @@ def main():
                 ].iloc[0]
                 
                 display_stock_chart(selected_data)
-            else:
+            elif len(selected_rows) == 0:
                 st.info("💡 차트를 보려면 테이블에서 종목의 체크박스를 선택하세요.")
 
         else:
