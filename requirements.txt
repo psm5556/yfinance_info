@@ -5,4 +5,3 @@ requests==2.31.0
 beautifulsoup4==4.12.3
 plotly==5.18.0
 st-aggrid==0.3.4
-st_aggrid
