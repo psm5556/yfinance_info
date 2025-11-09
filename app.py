@@ -532,26 +532,12 @@ def main():
                         daily_changes = stock_data['Close'].pct_change() * 100
                         cumulative_returns = ((stock_data['Close'] / base_price) - 1) * 100
 
-                        # yfinance에서 재무 데이터 가져오기 (주요 소스)
-                        financial_data = get_yfinance_financial_data(ticker)
-                        
-                        debt_ratio = financial_data['debt_ratio']
-                        current_ratio = financial_data['current_ratio']
-                        roe = financial_data['roe']
-                        total_cash = financial_data['total_cash']
-                        free_cash_flow = financial_data['free_cash_flow']
-                        
-                        # yfinance에서 데이터를 못 가져온 경우에만 Finviz 시도 (백업)
-                        if debt_ratio is None:
-                            debt_ratio = get_finviz_metric(ticker, "Debt/Eq")
-                        if current_ratio is None:
-                            current_ratio = get_finviz_metric(ticker, "Current Ratio")
-                        if roe is None:
-                            roe = get_finviz_metric(ticker, "ROE")
-                        if total_cash is None:
-                            total_cash = get_finviz_data(ticker, "BS", "Cash & Short Term Investments")
-                        if free_cash_flow is None:
-                            free_cash_flow = get_finviz_data(ticker, "CF", "Free Cash Flow")
+                        # Finviz에서 재무 데이터 가져오기
+                        debt_ratio = get_finviz_metric(ticker, "Debt/Eq")
+                        current_ratio = get_finviz_metric(ticker, "Current Ratio")
+                        roe = get_finviz_metric(ticker, "ROE")
+                        total_cash = get_finviz_data(ticker, "BS", "Cash & Short Term Investments")
+                        free_cash_flow = get_finviz_data(ticker, "CF", "Free Cash Flow")
 
                         runway = "-"
                         if total_cash and free_cash_flow and free_cash_flow < 0:
