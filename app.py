@@ -364,7 +364,7 @@ def create_mini_chart(data, chart_type='line'):
 def main():
     st.title("📊 투자 포트폴리오 대시보드")
 
-    st.sidebar.header(⚙️ 설정")
+    st.sidebar.header(" ⚙️ 설정 ")
 
     default_start = datetime(2025, 10, 9)
     default_end = datetime.now()
