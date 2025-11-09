@@ -10,6 +10,7 @@ from plotly.subplots import make_subplots
 import json
 import time
 import yfinance as yf
+import cloudscraper
 
 # 크기 조정 상수
 SCALE = 0.75
@@ -203,109 +204,60 @@ def load_portfolio_data():
     return df
 
 
-# Finviz 데이터 가져오기 (구글 스프레드시트 IMPORTHTML 방식 참조)
 @st.cache_data(ttl=86400)
 def get_finviz_metric(ticker, metric_name):
     """
-    Google Sheets의 IMPORTHTML 방식을 참조한 데이터 추출
-    - 부채비율: table 9, row 12, col 4
-    - 유동비율: table 9, row 11, col 4
-    - ROE: table 9, row 6, col 8
+    Finviz의 HTML 테이블에서 부채비율, 유동비율, ROE를 추출
+    (Google Sheets의 IMPORTHTML 방식 동일)
     """
     try:
+        # Cloudflare 우회 세션
+        scraper = cloudscraper.create_scraper()
         url = f"https://finviz.com/quote.ashx?t={ticker}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Cache-Control': 'max-age=0'
-        }
-        
-        session = requests.Session()
-        response = session.get(url, headers=headers, timeout=15, allow_redirects=True)
-        
+        response = scraper.get(url, timeout=20)
+
         if response.status_code != 200:
             print(f"[WARNING] {ticker} HTTP {response.status_code}")
             return "-"
-        
-        time.sleep(0.01)  # Rate limiting
-        
+
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # 구글 시트의 IMPORTHTML과 동일하게 모든 테이블을 가져옴
-        all_tables = soup.find_all('table')
-        
-        # metric_name에 따라 테이블 인덱스와 위치 지정
-        metric_mapping = {
-            'Debt/Eq': {'table_idx': 9, 'row': 12, 'col': 4},      # 부채비율
-            'Current Ratio': {'table_idx': 9, 'row': 11, 'col': 4}, # 유동비율
-            'ROE': {'table_idx': 9, 'row': 6, 'col': 8}            # ROE
+        tables = soup.find_all('table')
+        if len(tables) < 10:
+            print(f"[WARNING] {ticker} 테이블 수 부족")
+            return "-"
+
+        target_table = tables[9]
+        rows = target_table.find_all('tr')
+
+        metric_map = {
+            "Debt/Eq": (12, 4),       # 부채비율
+            "Current Ratio": (11, 4),  # 유동비율
+            "ROE": (6, 8)              # ROE
         }
-        
-        if metric_name in metric_mapping:
-            mapping = metric_mapping[metric_name]
-            
-            # 테이블 인덱스 확인
-            if len(all_tables) > mapping['table_idx']:
-                target_table = all_tables[mapping['table_idx']]
-                rows = target_table.find_all('tr')
-                
-                # 행 인덱스 확인
-                if len(rows) > mapping['row']:
-                    target_row = rows[mapping['row']]
-                    cells = target_row.find_all('td')
-                    
-                    # 열 인덱스 확인
-                    if len(cells) > mapping['col']:
-                        value = cells[mapping['col']].get_text(strip=True)
-                        
-                        # 값 처리 (구글 시트의 SPLIT 함수가 '*'를 제거하므로 동일하게 처리)
-                        if value == '-' or value == '':
-                            return "-"
-                        
-                        # '*' 기호 제거 및 숫자 변환
-                        value = value.split('*')[0].strip()
-                        value = value.replace('%', '').replace(',', '')
-                        
-                        try:
-                            # 구글 시트에서는 *100을 하므로 여기서는 원본 값 반환 (비율)
-                            return float(value)
-                        except:
-                            return "-"
-        
-        # 매핑에 없는 metric의 경우 기존 방식 사용 (백업)
-        tables = soup.find_all('table', {'class': 'snapshot-table2'})
-        
-        for table in tables:
-            rows = table.find_all('tr')
-            for row in rows:
-                cells = row.find_all('td')
-                for i in range(0, len(cells) - 1, 2):
-                    label = cells[i].get_text(strip=True)
-                    if label == metric_name:
-                        value = cells[i + 1].get_text(strip=True)
-                        if value == '-' or value == '':
-                            return "-"
-                        # 숫자 변환
-                        value = value.replace('%', '').replace(',', '').replace('B', '').replace('M', '')
-                        try:
-                            return float(value)
-                        except:
-                            return value
-        
-        return "-"
-        
-    except requests.exceptions.Timeout:
-        print(f"[WARNING] {ticker} Timeout")
-        return "-"
+
+        if metric_name not in metric_map:
+            return "-"
+
+        row_idx, col_idx = metric_map[metric_name]
+        if len(rows) <= row_idx:
+            return "-"
+
+        cells = rows[row_idx].find_all('td')
+        if len(cells) <= col_idx:
+            return "-"
+
+        raw_value = cells[col_idx].get_text(strip=True)
+        if raw_value in ("-", ""):
+            return "-"
+
+        # Google Sheets의 SPLIT(...,"*")*100 처리 반영
+        raw_value = raw_value.split('*')[0].replace('%', '').replace(',', '')
+        try:
+            return float(raw_value)
+        except:
+            return "-"
     except Exception as e:
-        print(f"[WARNING] {ticker} {metric_name} 조회 실패: {e}")
+        print(f"[ERROR] {ticker} {metric_name} 조회 실패: {e}")
         return "-"
 
 # Finviz API에서 재무제표 데이터 가져오기
