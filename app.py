@@ -847,13 +847,7 @@ def main():
             # 번호 컬럼 추가
             display_df.insert(1, '번호', range(1, len(display_df) + 1))
 
-            # 스타일 적용
-            display_df = (
-                display_df.style
-                .map(highlight_positive_negative,
-                     subset=["누적수익률(기준가)", "누적수익률(최고가)", "일일수익", "일일수익률", "ROE"])
-                .map(highlight_low_debt_ratio, subset=["부채비율"])
-            )
+            
 
             
             
@@ -863,6 +857,14 @@ def main():
                 ticker_idx = display_df[display_df['티커'] == st.session_state.selected_ticker].index
                 if len(ticker_idx) > 0:
                     display_df.loc[ticker_idx[0], '선택'] = True
+
+            # 스타일 적용
+            display_df = (
+                display_df.style
+                .map(highlight_positive_negative,
+                     subset=["누적수익률(기준가)", "누적수익률(최고가)", "일일수익", "일일수익률", "ROE"])
+                .map(highlight_low_debt_ratio, subset=["부채비율"])
+            )
             
             # 테이블 표시 (편집 가능)
             edited_df = st.data_editor(
