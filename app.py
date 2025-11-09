@@ -234,7 +234,7 @@ def get_finviz_metric(ticker, metric_name):
             print(f"[WARNING] {ticker} HTTP {response.status_code}")
             return "-"
         
-        time.sleep(0.5)  # Rate limiting
+        time.sleep(0.01)  # Rate limiting
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -338,7 +338,7 @@ def get_finviz_data(ticker, statement, item):
             print(f"[WARNING] {ticker} API HTTP {response.status_code}")
             return None
         
-        time.sleep(0.5)  # Rate limiting
+        time.sleep(0.01)  # Rate limiting
         
         data = response.json()
 
@@ -444,11 +444,22 @@ def get_stock_data_with_ma(ticker, interval="1d"):
     try:
         import yfinance as yf
         
-        # 기간 설정
-        period = "2y"  # 이동평균선 계산을 위해 2년치 가져옴
+        # 기간 설정 - 이동평균선 계산을 위해 충분한 데이터 필요
+        if interval == "1d":
+            period = "3y"  # 일봉: 3년치 데이터
+            ma_periods = [200, 240, 365]
+            display_days = 547  # 1년 6개월
+        else:  # 1wk
+            period = "10y"  # 주봉: 10년치 데이터 (충분한 데이터 확보)
+            ma_periods = [200, 240, 365]
+            display_weeks = 78  # 1년 6개월
         
         yf_ticker = yf.Ticker(ticker)
         df = yf_ticker.history(period=period, interval=interval)
+        
+        if df is None or df.empty:
+            # period로 실패하면 max로 시도
+            df = yf_ticker.history(period="max", interval=interval)
         
         if df is None or df.empty:
             return None
@@ -456,20 +467,34 @@ def get_stock_data_with_ma(ticker, interval="1d"):
         df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
         
         # 이동평균선 계산
-        df["MA200"] = df["Close"].rolling(200).mean()
-        df["MA240"] = df["Close"].rolling(240).mean()
-        df["MA365"] = df["Close"].rolling(365).mean()
+        for ma_period in ma_periods:
+            df[f"MA{ma_period}"] = df["Close"].rolling(ma_period).mean()
         
-        # 최근 1년 6개월 데이터만 반환 (약 547일 또는 78주)
+        # NaN 제거 전 충분한 데이터가 있는지 확인
+        if len(df) < max(ma_periods):
+            # 데이터가 부족하면 최소한의 이동평균선만 계산
+            return None
+        
+        # 최근 1년 6개월 데이터만 표시 (하지만 이동평균선은 전체 데이터로 계산됨)
         if interval == "1d":
-            lookback = min(547, len(df))
+            lookback = min(display_days, len(df))
         else:  # 1wk
-            lookback = min(78, len(df))
-            
-        df = df.iloc[-lookback:]
-        df.dropna(subset=["MA200", "MA240", "MA365"], inplace=True)
+            lookback = min(display_weeks, len(df))
         
-        return df if not df.empty else None
+        # 이동평균선 값이 있는 데이터만 필터링
+        df_display = df.iloc[-lookback:].copy()
+        
+        # 최소한 하나의 이동평균선이라도 있는지 확인
+        has_ma = False
+        for ma_period in ma_periods:
+            if not df_display[f"MA{ma_period}"].isna().all():
+                has_ma = True
+                break
+        
+        if not has_ma:
+            return None
+        
+        return df_display if not df_display.empty else None
         
     except Exception as e:
         print(f"Error fetching data with MA for {ticker}: {e}")
@@ -701,17 +726,32 @@ def main():
 
     st.sidebar.header("⚙️ 설정")
 
+    # 날짜 설정을 2열로 배치
+    st.sidebar.subheader("📅 날짜 범위")
     default_start = datetime(2025, 10, 9)
     default_end = datetime.now()
 
-    start_date = st.sidebar.date_input("시작일", default_start)
-    end_date = st.sidebar.date_input("종료일", default_end)
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        start_date = st.date_input("시작일", default_start, key="start")
+    with col2:
+        end_date = st.date_input("종료일", default_end, key="end")
 
-    st.sidebar.subheader("차트 Y축 범위")
-    change_y_min = st.sidebar.number_input("변동율 Y축 최소값", value=-10)
-    change_y_max = st.sidebar.number_input("변동율 Y축 최대값", value=10)
-    return_y_min = st.sidebar.number_input("누적수익율 Y축 최소값", value=-50)
-    return_y_max = st.sidebar.number_input("누적수익율 Y축 최대값", value=50)
+    # 변동율 Y축 범위를 2열로 배치
+    st.sidebar.subheader("📊 변동율 Y축")
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        change_y_min = st.number_input("최소값", value=-10, key="change_min")
+    with col2:
+        change_y_max = st.number_input("최대값", value=10, key="change_max")
+
+    # 누적수익율 Y축 범위를 2열로 배치
+    st.sidebar.subheader("📈 누적수익율 Y축")
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        return_y_min = st.number_input("최소값", value=-50, key="return_min")
+    with col2:
+        return_y_max = st.number_input("최대값", value=50, key="return_max")
 
     analyze_button = st.sidebar.button("🔍 분석 시작", type="primary", use_container_width=True)
 
