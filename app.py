@@ -557,29 +557,31 @@ def main():
                     lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x
                 )
 
-            # 테이블 표시 및 행 선택 기능
-            st.info("💡 테이블의 행을 클릭하면 해당 종목의 상세 차트가 아래에 표시됩니다.")
-            
-            event = st.dataframe(
+            # 테이블 표시
+            st.dataframe(
                 display_df.style.applymap(
                     highlight_returns,
                     subset=['누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률']
                 ),
                 use_container_width=True,
-                height=int(600 * SCALE),
-                on_select="rerun",
-                selection_mode="single-row"
+                height=int(600 * SCALE)
             )
 
-            # 행이 선택되면 해당 종목의 차트 표시
-            if event.selection and len(event.selection.rows) > 0:
-                selected_row_idx = event.selection.rows[0]
-                selected_ticker = st.session_state['result_df'].iloc[selected_row_idx]['티커']
-                selected_data = st.session_state['result_df'][
-                    st.session_state['result_df']['티커'] == selected_ticker
-                ].iloc[0]
-                
-                display_stock_chart(selected_data)
+            # 개별 종목 차트 표시
+            st.markdown("---")
+            st.subheader("📈 개별 종목 상세 차트")
+            
+            selected_ticker = st.selectbox(
+                "종목 선택",
+                st.session_state['result_df']['티커'].tolist(),
+                format_func=lambda x: f"{x} - {st.session_state['result_df'][st.session_state['result_df']['티커'] == x]['기업명'].iloc[0]}"
+            )
+
+            selected_data = st.session_state['result_df'][
+                st.session_state['result_df']['티커'] == selected_ticker
+            ].iloc[0]
+            
+            display_stock_chart(selected_data)
 
         else:
             st.info("분석을 실행해주세요.")
