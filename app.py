@@ -656,9 +656,33 @@ def main():
             result_df = st.session_state['result_df']
             
             st.subheader("📊 트렌드 분석")
+
+            # ✅ 4️⃣ 청팀 vs 백팀 누적수익률 비교 (가중평균 포함)
+            st.markdown("### 1️⃣ 청팀 vs 백팀 누적수익률 비교 (가중평균 포함)")
+            team_returns={}
+            for team in result_df['팀'].unique():
+                stocks=result_df[result_df['팀']==team]
+                arr=[r['cumulative_returns'].dropna() for _,r in stocks.iterrows() if r['cumulative_returns'] is not None]
+                if arr:
+                    team_returns[team]=pd.concat(arr,axis=1).mean(axis=1)
+            if team_returns:
+                total=sum(len(result_df[result_df['팀']==t]) for t in team_returns.keys())
+                weighted={t:d*(len(result_df[result_df['팀']==t])/total) for t,d in team_returns.items()}
+                total_weighted=sum(weighted.values())
+    
+                fig=go.Figure()
+                for t,d in team_returns.items():
+                    fig.add_trace(go.Scatter(x=d.index,y=d.values,mode='lines',name=f"{t} 평균"))
+                fig.add_trace(go.Scatter(x=total_weighted.index,y=total_weighted.values,
+                                         mode='lines',name="시장 전체 가중평균",
+                                         line=dict(width=3,dash='dot',color='black')))
+                fig.update_layout(title="청팀 vs 백팀 누적수익률 비교 (가중평균 포함)",
+                                  height=500,hovermode='x unified')
+                fig.add_hline(y=0,line_dash="dash",line_color="gray")
+                st.plotly_chart(fig,use_container_width=True)
             
             # 차트 1: 팀별 평균 변동률 트렌드
-            st.markdown("### 1️⃣ 팀별 평균 변동률 트렌드")
+            st.markdown("### 2️⃣ 팀별 평균 변동률 트렌드")
             
             team_data = {}
             for team in result_df['팀'].unique():
@@ -666,8 +690,8 @@ def main():
                 all_changes = []
                 
                 for idx, row in team_stocks.iterrows():
-                    if row['daily_changes'] is not None:
-                        all_changes.append(row['daily_changes'].dropna())
+                    if row['cumulative_returns'] is not None: #cumulative_returns, daily_changes
+                        all_changes.append(row['cumulative_returns'].dropna())
                 
                 if all_changes:
                     # 모든 날짜의 평균 계산
@@ -698,7 +722,7 @@ def main():
                 st.plotly_chart(fig_team, use_container_width=True)
             
             # 차트 2: 섹터별 평균 변동률 트렌드
-            st.markdown("### 2️⃣ 섹터별 평균 변동률 트렌드")
+            st.markdown("### 3️⃣ 섹터별 평균 변동률 트렌드")
             
             sector_data = {}
             for sector in result_df['섹터'].unique():
@@ -706,8 +730,8 @@ def main():
                 all_changes = []
                 
                 for idx, row in sector_stocks.iterrows():
-                    if row['daily_changes'] is not None:
-                        all_changes.append(row['daily_changes'].dropna())
+                    if row['cumulative_returns'] is not None:  #cumulative_returns, daily_changes
+                        all_changes.append(row['cumulative_returns'].dropna())
                 
                 if all_changes:
                     combined = pd.concat(all_changes, axis=1)
@@ -737,7 +761,7 @@ def main():
                 st.plotly_chart(fig_sector, use_container_width=True)
             
             # 차트 3: 섹터별 개별 종목 변동률 (서브플롯)
-            st.markdown("### 3️⃣ 섹터별 개별 종목 변동률")
+            st.markdown("### 4️⃣ 섹터별 개별 종목 변동률")
             
             sectors = result_df['섹터'].unique()
             
@@ -761,8 +785,8 @@ def main():
                     )
                     
                     for idx, (_, row) in enumerate(sector_stocks.iterrows()):
-                        if row['daily_changes'] is not None:
-                            changes = row['daily_changes'].dropna()
+                        if row['cumulative_returns'] is not None: #cumulative_returns, daily_changes
+                            changes = row['cumulative_returns'].dropna()
                             colors = ['green' if x >= 0 else 'red' for x in changes]
                             
                             row_num = (idx // 3) + 1
@@ -783,7 +807,8 @@ def main():
                     fig.update_layout(
                         height=300 * rows,
                         title_text=f"{sector} 섹터 변동률",
-                        showlegend=False
+                        showlegend=False,
+                        yaxis=dict(range=[change_y_min, change_y_max]),
                     )
                     
                     # 모든 서브플롯에 0선 추가
@@ -798,29 +823,7 @@ def main():
                             )
                     
                     st.plotly_chart(fig, use_container_width=True)
-            # ✅ 4️⃣ 청팀 vs 백팀 누적수익률 비교 (가중평균 포함)
-            st.markdown("### 4️⃣ 청팀 vs 백팀 누적수익률 비교 (가중평균 포함)")
-            team_returns={}
-            for team in result_df['팀'].unique():
-                stocks=result_df[result_df['팀']==team]
-                arr=[r['cumulative_returns'].dropna() for _,r in stocks.iterrows() if r['cumulative_returns'] is not None]
-                if arr:
-                    team_returns[team]=pd.concat(arr,axis=1).mean(axis=1)
-            if team_returns:
-                total=sum(len(result_df[result_df['팀']==t]) for t in team_returns.keys())
-                weighted={t:d*(len(result_df[result_df['팀']==t])/total) for t,d in team_returns.items()}
-                total_weighted=sum(weighted.values())
-    
-                fig=go.Figure()
-                for t,d in team_returns.items():
-                    fig.add_trace(go.Scatter(x=d.index,y=d.values,mode='lines',name=f"{t} 평균"))
-                fig.add_trace(go.Scatter(x=total_weighted.index,y=total_weighted.values,
-                                         mode='lines',name="시장 전체 가중평균",
-                                         line=dict(width=3,dash='dot',color='black')))
-                fig.update_layout(title="청팀 vs 백팀 누적수익률 비교 (가중평균 포함)",
-                                  height=500,hovermode='x unified')
-                fig.add_hline(y=0,line_dash="dash",line_color="gray")
-                st.plotly_chart(fig,use_container_width=True)
+            
         else:
             st.info("먼저 '포트폴리오 분석' 탭에서 분석을 실행해주세요.")
 
