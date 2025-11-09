@@ -199,11 +199,12 @@ def load_portfolio_data():
     return df
 
 # Finviz 데이터 가져오기
+@st.cache_data(ttl=86400)
 def get_finviz_metric(ticker, metric_name):
     try:
         url = f"https://finviz.com/quote.ashx?t={ticker}"
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=100)
         soup = BeautifulSoup(response.text, 'html.parser')
         
         tables = soup.find_all('table', {'class': 'snapshot-table2'})
@@ -230,11 +231,12 @@ def get_finviz_metric(ticker, metric_name):
         return "-"
 
 # Finviz API 데이터 가져오기
+@st.cache_data(ttl=86400)
 def get_finviz_data(ticker, statement, item):
     try:
         statement_map = {"IS": "IQ", "BS": "BQ", "CF": "CQ"}
         url = f"https://finviz.com/api/statement.ashx?t={ticker}&so=F&s={statement_map[statement]}"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=100)
         data = response.json()
         
         if data and 'data' in data and item in data['data']:
