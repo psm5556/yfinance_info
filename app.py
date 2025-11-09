@@ -682,7 +682,7 @@ def main():
                     fig.add_trace(go.Scatter(x=d.index, y=d.values, mode='lines', name=f"{t} 평균"))
                 fig.add_trace(go.Scatter(x=total_weighted.index, y=total_weighted.values,
                                          mode='lines', name="시장 전체 가중평균",
-                                         line=dict(width=max(int(3 * SCALE), 1), dash='dot', color='black')))
+                                         line=dict(width=max(int(3 * SCALE), 1), dash='dot', color='red')))
                 fig.update_layout(title="청팀 vs 백팀 누적수익률 비교 (가중평균 포함)",
                                   height=int(500 * SCALE),  # 500 → 375
                                   hovermode='x unified')
@@ -690,7 +690,7 @@ def main():
                 st.plotly_chart(fig, use_container_width=True)
 
             # 차트 2: 팀별 평균 변동률 트렌드
-            st.markdown("### 2️⃣ 팀별 평균 변동률 트렌드")
+            # st.markdown("### 2️⃣ 팀별 평균 변동률 트렌드")
 
             team_data = {}
             for team in result_df['팀'].unique():
@@ -719,7 +719,7 @@ def main():
                     ))
 
                 fig_team.update_layout(
-                    title="팀별 평균 변동률 비교",
+                    title="청팀 vs 백팀 평균 변동률 비교",
                     xaxis_title="날짜",
                     yaxis_title="평균 변동률 (%)",
                     height=int(500 * SCALE),  # 500 → 375
@@ -729,8 +729,8 @@ def main():
                 fig_team.add_hline(y=0, line_dash="dash", line_color="gray")
                 st.plotly_chart(fig_team, use_container_width=True)
 
-            # 차트 3: 섹터별 평균 누적변동률 트렌드
-            st.markdown("### 3️⃣ 섹터별 평균 누적변동률 트렌드")
+            # 차트 2: 섹터별 평균 누적변동률 트렌드
+            st.markdown("### 2️⃣ 섹터별 평균 누적변동률 트렌드")
 
             sector_data = {}
             for sector in result_df['섹터'].unique():
@@ -739,7 +739,7 @@ def main():
 
                 for idx, row in sector_stocks.iterrows():
                     if row['cumulative_returns'] is not None:  # cumulative_returns, daily_changes
-                        all_changes.append(row['daily_changes'].dropna())
+                        all_changes.append(row['cumulative_returns'].dropna())
 
                 if all_changes:
                     combined = pd.concat(all_changes, axis=1)
@@ -768,8 +768,8 @@ def main():
                 fig_sector.add_hline(y=0, line_dash="dash", line_color="gray")
                 st.plotly_chart(fig_sector, use_container_width=True)
 
-            # 차트 4: 섹터별 개별 종목 누적변동률 (서브플롯)
-            st.markdown("### 4️⃣ 섹터별 개별 종목 누적변동률")
+            # 차트 3: 섹터별 개별 종목 누적변동률 (서브플롯)4️⃣
+            st.markdown("### 3️⃣ 섹터별 개별 종목 누적변동률")
 
             sectors = result_df['섹터'].unique()
 
