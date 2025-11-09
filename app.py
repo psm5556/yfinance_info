@@ -774,23 +774,24 @@ def main():
                     if n_stocks == 0:
                         continue
                     
-                    rows = (n_stocks + 2) // 5  # 3열 레이아웃
+                    cols = 5  # ✅ 5열로 변경
+                    rows = (n_stocks + cols - 1) // cols  # 행 자동 계산
                     
                     fig = make_subplots(
                         rows=rows,
-                        cols=3,
+                        cols=cols,
                         subplot_titles=[f"{row['티커']}" for _, row in sector_stocks.iterrows()],
                         vertical_spacing=0.1,
-                        horizontal_spacing=0.05
+                        horizontal_spacing=0.03
                     )
                     
                     for idx, (_, row) in enumerate(sector_stocks.iterrows()):
-                        if row['cumulative_returns'] is not None: #cumulative_returns, daily_changes
+                        if row['cumulative_returns'] is not None:
                             changes = row['cumulative_returns'].dropna()
                             colors = ['green' if x >= 0 else 'red' for x in changes]
                             
-                            row_num = (idx // 5) + 1
-                            col_num = (idx % 5) + 1
+                            row_num = (idx // cols) + 1
+                            col_num = (idx % cols) + 1
                             
                             fig.add_trace(
                                 go.Bar(
@@ -803,9 +804,7 @@ def main():
                                 row=row_num,
                                 col=col_num
                             )
-                            fig.update_yaxes(
-                                range=[return_y_min, return_y_max]
-                            )
+                            fig.update_yaxes(range=[return_y_min, return_y_max])
                     
                     fig.update_layout(
                         height=300 * rows,
@@ -815,7 +814,7 @@ def main():
                     
                     # 모든 서브플롯에 0선 추가
                     for i in range(1, rows + 1):
-                        for j in range(1, 4):
+                        for j in range(1, cols + 1):
                             fig.add_hline(
                                 y=0,
                                 line_dash="dash",
@@ -825,6 +824,7 @@ def main():
                             )
                     
                     st.plotly_chart(fig, use_container_width=True)
+
             
         else:
             st.info("먼저 '포트폴리오 분석' 탭에서 분석을 실행해주세요.")
