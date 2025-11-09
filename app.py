@@ -205,59 +205,40 @@ def load_portfolio_data():
 
 
 @st.cache_data(ttl=86400)
-def get_finviz_metric(ticker, metric_name):
+def get_finviz_metric(ticker: str, metric_name: str):
     """
-    Finviz의 HTML 테이블에서 부채비율, 유동비율, ROE를 추출
-    (Google Sheets의 IMPORTHTML 방식 동일)
+    Finviz 'snapshot-table2'에서 label 기반으로 재무지표 추출
+    예: metric_name = "Debt/Eq", "Current Ratio", "ROE"
     """
     try:
-        # Cloudflare 우회 세션
-        scraper = cloudscraper.create_scraper()
         url = f"https://finviz.com/quote.ashx?t={ticker}"
-        response = scraper.get(url, timeout=20)
-
-        if response.status_code != 200:
-            print(f"[WARNING] {ticker} HTTP {response.status_code}")
-            return "-"
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-        tables = soup.find_all('table')
-        if len(tables) < 10:
-            print(f"[WARNING] {ticker} 테이블 수 부족")
-            return "-"
-
-        target_table = tables[9]
-        rows = target_table.find_all('tr')
-
-        metric_map = {
-            "Debt/Eq": (12, 4),       # 부채비율
-            "Current Ratio": (11, 4),  # 유동비율
-            "ROE": (6, 8)              # ROE
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         }
-
-        if metric_name not in metric_map:
+        res = requests.get(url, headers=headers, timeout=20)
+        if res.status_code != 200:
+            print(f"[{ticker}] HTTP {res.status_code}")
             return "-"
 
-        row_idx, col_idx = metric_map[metric_name]
-        if len(rows) <= row_idx:
+        soup = BeautifulSoup(res.text, "html.parser")
+        table = soup.find("table", {"class": "snapshot-table2"})
+        if table is None:
+            print(f"[{ticker}] snapshot-table2 not found")
             return "-"
 
-        cells = rows[row_idx].find_all('td')
-        if len(cells) <= col_idx:
-            return "-"
-
-        raw_value = cells[col_idx].get_text(strip=True)
-        if raw_value in ("-", ""):
-            return "-"
-
-        # Google Sheets의 SPLIT(...,"*")*100 처리 반영
-        raw_value = raw_value.split('*')[0].replace('%', '').replace(',', '')
-        try:
-            return float(raw_value)
-        except:
-            return "-"
+        cells = table.find_all("td")
+        for i in range(0, len(cells) - 1, 2):
+            label = cells[i].get_text(strip=True)
+            value = cells[i + 1].get_text(strip=True)
+            if label.lower() == metric_name.lower():
+                clean = value.split("*")[0].replace("%", "").replace(",", "")
+                try:
+                    return float(clean)
+                except ValueError:
+                    return clean
+        return "-"
     except Exception as e:
-        print(f"[ERROR] {ticker} {metric_name} 조회 실패: {e}")
+        print(f"[{ticker}] {metric_name} error: {e}")
         return "-"
 
 # Finviz API에서 재무제표 데이터 가져오기
