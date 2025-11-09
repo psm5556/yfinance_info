@@ -557,48 +557,54 @@ def main():
                     lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x
                 )
 
-            # 체크박스 컬럼 추가
-            display_df.insert(0, '선택', False)
+            # 번호 컬럼 추가
+            display_df.insert(0, '번호', range(1, len(display_df) + 1))
+            
+            # 단일 선택을 위한 라디오 버튼 컬럼 추가
+            display_df.insert(1, '선택', False)
             
             # 테이블 표시 (편집 가능)
             edited_df = st.data_editor(
-                display_df.style.applymap(
-                    highlight_returns,
-                    subset=['누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률']
-                ),
+                display_df,
                 use_container_width=True,
                 height=int(600 * SCALE),
                 hide_index=True,
                 column_config={
+                    "번호": st.column_config.NumberColumn(
+                        "번호",
+                        help="종목 순번",
+                        width="small",
+                        disabled=True
+                    ),
                     "선택": st.column_config.CheckboxColumn(
                         "선택",
-                        help="차트를 보고 싶은 종목을 선택하세요",
+                        help="차트를 보고 싶은 종목을 선택하세요 (단일 선택)",
                         default=False,
                     )
                 },
-                disabled=[col for col in display_df.columns if col != '선택'],
+                disabled=[col for col in display_df.columns if col not in ['선택']],
                 key='stock_table'
             )
 
-            # 선택된 종목들 가져오기
+            # 선택된 종목 가져오기 (단일 선택만 허용)
             selected_rows = edited_df[edited_df['선택'] == True]
             
-            if len(selected_rows) > 0:
+            if len(selected_rows) > 1:
+                st.warning("⚠️ 한 번에 하나의 종목만 선택해주세요. 가장 최근 선택이 적용됩니다.")
+                selected_row = selected_rows.iloc[-1]
+            elif len(selected_rows) == 1:
+                selected_row = selected_rows.iloc[0]
+            else:
+                selected_row = None
+            
+            if selected_row is not None:
                 st.markdown("---")
-                st.subheader(f"📈 선택된 종목 상세 차트 ({len(selected_rows)}개)")
+                selected_ticker = selected_row['티커']
+                selected_data = st.session_state['result_df'][
+                    st.session_state['result_df']['티커'] == selected_ticker
+                ].iloc[0]
                 
-                # 선택된 각 종목의 차트 표시
-                for idx, row in selected_rows.iterrows():
-                    selected_ticker = row['티커']
-                    selected_data = st.session_state['result_df'][
-                        st.session_state['result_df']['티커'] == selected_ticker
-                    ].iloc[0]
-                    
-                    display_stock_chart(selected_data)
-                    
-                    # 종목 간 구분선
-                    if idx < len(selected_rows) - 1:
-                        st.markdown("---")
+                display_stock_chart(selected_data)
             else:
                 st.info("💡 차트를 보려면 테이블에서 종목의 체크박스를 선택하세요.")
 
