@@ -1141,6 +1141,7 @@ def main():
             # 데이터 수집 (선택된 히트맵 타입에 따라)
             heatmap_data = []
             stock_labels = []
+            sector_labels = []
             
             if heatmap_type == "일일변동률":
                 data_column = 'daily_changes'
@@ -1151,19 +1152,27 @@ def main():
                 title_text = "누적변동률 히트맵 (시작일~종료일)"
                 metric_label = "누적변동률"
             
-            for idx, row in filtered_df.iterrows():
+            # 섹터별로 정렬된 데이터 수집
+            filtered_df_sorted = filtered_df.sort_values('섹터')
+            
+            for idx, row in filtered_df_sorted.iterrows():
                 if row[data_column] is not None and not row[data_column].empty:
                     stock_label = f"{row['기업명']}({row['티커']})"
                     stock_labels.append(stock_label)
+                    sector_labels.append(row['섹터'])
                     heatmap_data.append(row[data_column].values)
             
             if heatmap_data:
                 # 데이터프레임으로 변환
                 # 모든 종목의 날짜를 통합
-                all_dates = filtered_df[filtered_df[data_column].notna()][data_column].iloc[0].index
+                all_dates = filtered_df_sorted[filtered_df_sorted[data_column].notna()][data_column].iloc[0].index
                 
                 heatmap_df = pd.DataFrame(heatmap_data, index=stock_labels)
                 heatmap_df.columns = all_dates
+                
+                # y축 순서를 반대로 (위에서 아래로)
+                heatmap_df = heatmap_df.iloc[::-1]
+                sector_labels_reversed = sector_labels[::-1]
                 
                 # 히트맵 생성
                 fig_heatmap = go.Figure(data=go.Heatmap(
@@ -1181,6 +1190,26 @@ def main():
                     colorbar=dict(title="변동률 (%)"),
                     hovertemplate='%{y}<br>날짜: %{x}<br>변동률: %{z:.2f}%<extra></extra>'
                 ))
+                
+                # 섹터별 구분선 추가
+                sector_boundaries = []
+                current_sector = None
+                for i, sector in enumerate(sector_labels_reversed):
+                    if sector != current_sector and current_sector is not None:
+                        # 섹터가 바뀌는 지점에 선 추가 (y축 인덱스 기준)
+                        sector_boundaries.append(i - 0.5)
+                    current_sector = sector
+                
+                # 구분선 그리기
+                for boundary in sector_boundaries:
+                    fig_heatmap.add_shape(
+                        type="line",
+                        x0=-0.5,
+                        x1=len(heatmap_df.columns) - 0.5,
+                        y0=boundary,
+                        y1=boundary,
+                        line=dict(color="black", width=2)
+                    )
                 
                 fig_heatmap.update_layout(
                     title=title_text,
