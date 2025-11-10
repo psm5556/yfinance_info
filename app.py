@@ -405,29 +405,6 @@ def get_stock_data_with_ma(ticker, interval="1d"):
         df.dropna(inplace=True)
 
         df_display = df
-        # # NaN 제거 전 충분한 데이터가 있는지 확인
-        # if len(df) < max(ma_periods):
-        #     # 데이터가 부족하면 최소한의 이동평균선만 계산
-        #     return None
-        
-        # # 최근 1년 6개월 데이터만 표시 (하지만 이동평균선은 전체 데이터로 계산됨)
-        # if interval == "1d":
-        #     lookback = min(display_days, len(df))
-        # else:  # 1wk
-        #     lookback = min(display_weeks, len(df))
-        
-        # # 이동평균선 값이 있는 데이터만 필터링
-        # df_display = df.iloc[-lookback:].copy()
-        
-        # # 최소한 하나의 이동평균선이라도 있는지 확인
-        # has_ma = False
-        # for ma_period in ma_periods:
-        #     if not df_display[f"MA{ma_period}"].isna().all():
-        #         has_ma = True
-        #         break
-        
-        # if not has_ma:
-        #     return None
         
         return df_display if not df_display.empty else None
         
@@ -711,7 +688,7 @@ def main():
 
     portfolio_df = load_portfolio_data()
 
-    tab1, tab2 = st.tabs(["📈 포트폴리오 분석", "📊 트렌드 분석"])
+    tab1, tab2, tab3 = st.tabs(["📈 포트폴리오 분석", "📊 트렌드 분석", "🔥 일일변동률 히트맵"])
 
     with tab1:
         if analyze_button or 'results' in st.session_state:
@@ -1114,6 +1091,121 @@ def main():
 
                     st.plotly_chart(fig, use_container_width=True)
 
+        else:
+            st.info("먼저 '포트폴리오 분석' 탭에서 분석을 실행해주세요.")
+
+    with tab3:
+        if 'results' in st.session_state:
+            results = st.session_state['results']
+            result_df = st.session_state['result_df']
+
+            st.subheader("🔥 일일변동률 히트맵")
+            
+            # 필터 옵션
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                filter_option = st.selectbox(
+                    "필터",
+                    ["전체", "팀별", "섹터별"],
+                    key="heatmap_filter"
+                )
+            
+            with col2:
+                if filter_option == "팀별":
+                    selected_teams = st.multiselect(
+                        "팀 선택",
+                        options=result_df['팀'].unique(),
+                        default=result_df['팀'].unique(),
+                        key="team_filter"
+                    )
+                    filtered_df = result_df[result_df['팀'].isin(selected_teams)]
+                elif filter_option == "섹터별":
+                    selected_sectors = st.multiselect(
+                        "섹터 선택",
+                        options=result_df['섹터'].unique(),
+                        default=result_df['섹터'].unique(),
+                        key="sector_filter"
+                    )
+                    filtered_df = result_df[result_df['섹터'].isin(selected_sectors)]
+                else:
+                    filtered_df = result_df
+
+            # 일일변동률 데이터 수집
+            heatmap_data = []
+            stock_labels = []
+            
+            for idx, row in filtered_df.iterrows():
+                if row['daily_changes'] is not None and not row['daily_changes'].empty:
+                    stock_label = f"{row['기업명']}({row['티커']})"
+                    stock_labels.append(stock_label)
+                    heatmap_data.append(row['daily_changes'].values)
+            
+            if heatmap_data:
+                # 데이터프레임으로 변환
+                # 모든 종목의 날짜를 통합
+                all_dates = filtered_df[filtered_df['daily_changes'].notna()]['daily_changes'].iloc[0].index
+                
+                heatmap_df = pd.DataFrame(heatmap_data, index=stock_labels)
+                heatmap_df.columns = all_dates
+                
+                # 히트맵 생성
+                fig_heatmap = go.Figure(data=go.Heatmap(
+                    z=heatmap_df.values,
+                    x=[d.strftime('%Y-%m-%d') for d in heatmap_df.columns],
+                    y=heatmap_df.index,
+                    colorscale=[
+                        [0, '#d32f2f'],      # 진한 빨강 (큰 음수)
+                        [0.4, '#ffcdd2'],    # 연한 빨강
+                        [0.5, '#ffffff'],    # 흰색 (0)
+                        [0.6, '#c8e6c9'],    # 연한 초록
+                        [1, '#388e3c']       # 진한 초록 (큰 양수)
+                    ],
+                    zmid=0,
+                    colorbar=dict(title="변동률 (%)"),
+                    hovertemplate='%{y}<br>날짜: %{x}<br>변동률: %{z:.2f}%<extra></extra>'
+                ))
+                
+                fig_heatmap.update_layout(
+                    title="일일변동률 히트맵 (시작일~종료일)",
+                    xaxis_title="날짜",
+                    yaxis_title="종목",
+                    height=max(int(400 * SCALE), len(stock_labels) * 25),
+                    xaxis=dict(
+                        tickangle=-45,
+                        tickmode='auto',
+                        nticks=20
+                    ),
+                    yaxis=dict(
+                        tickmode='linear',
+                        automargin=True
+                    )
+                )
+                
+                st.plotly_chart(fig_heatmap, use_container_width=True)
+                
+                # 통계 정보 표시
+                st.markdown("### 📊 히트맵 통계")
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    avg_daily_change = heatmap_df.values.flatten().mean()
+                    st.metric("평균 일일변동률", f"{avg_daily_change:.2f}%")
+                
+                with col2:
+                    max_change = heatmap_df.values.flatten().max()
+                    st.metric("최대 상승률", f"{max_change:.2f}%")
+                
+                with col3:
+                    min_change = heatmap_df.values.flatten().min()
+                    st.metric("최대 하락률", f"{min_change:.2f}%")
+                
+                with col4:
+                    volatility = heatmap_df.values.flatten().std()
+                    st.metric("변동성 (표준편차)", f"{volatility:.2f}%")
+                
+            else:
+                st.warning("선택된 필터에 해당하는 데이터가 없습니다.")
+        
         else:
             st.info("먼저 '포트폴리오 분석' 탭에서 분석을 실행해주세요.")
 
