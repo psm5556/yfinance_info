@@ -1104,7 +1104,7 @@ def main():
             # 히트맵 타입 선택
             heatmap_type = st.radio(
                 "히트맵 유형",
-                ["일일변동률", "누적변동률"],
+                ["누적변동률", "일일변동률"],
                 horizontal=True,
                 key="heatmap_type"
             )
@@ -1141,7 +1141,6 @@ def main():
             # 데이터 수집 (선택된 히트맵 타입에 따라)
             heatmap_data = []
             stock_labels = []
-            sector_labels = []
             
             if heatmap_type == "일일변동률":
                 data_column = 'daily_changes'
@@ -1157,7 +1156,6 @@ def main():
                 if row[data_column] is not None and not row[data_column].empty:
                     stock_label = f"{row['기업명']}({row['티커']})"
                     stock_labels.append(stock_label)
-                    sector_labels.append(row['섹터'])
                     heatmap_data.append(row[data_column].values)
             
             if heatmap_data:
@@ -1170,7 +1168,6 @@ def main():
                 
                 # y축 순서를 반대로 (위에서 아래로)
                 heatmap_df = heatmap_df.iloc[::-1]
-                sector_labels_reversed = sector_labels[::-1]
                 
                 # 히트맵 생성
                 fig_heatmap = go.Figure(data=go.Heatmap(
@@ -1188,26 +1185,6 @@ def main():
                     colorbar=dict(title="변동률 (%)"),
                     hovertemplate='%{y}<br>날짜: %{x}<br>변동률: %{z:.2f}%<extra></extra>'
                 ))
-                
-                # 섹터별 구분선 추가
-                sector_boundaries = []
-                current_sector = None
-                for i, sector in enumerate(sector_labels_reversed):
-                    if sector != current_sector and current_sector is not None:
-                        # 섹터가 바뀌는 지점에 선 추가 (y축 인덱스 기준)
-                        sector_boundaries.append(i - 0.5)
-                    current_sector = sector
-                
-                # 구분선 그리기
-                for boundary in sector_boundaries:
-                    fig_heatmap.add_shape(
-                        type="line",
-                        x0=-0.5,
-                        x1=len(heatmap_df.columns) - 0.5,
-                        y0=boundary,
-                        y1=boundary,
-                        line=dict(color="black", width=2)
-                    )
                 
                 fig_heatmap.update_layout(
                     title=title_text,
