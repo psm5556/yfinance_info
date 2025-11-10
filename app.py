@@ -1099,7 +1099,15 @@ def main():
             results = st.session_state['results']
             result_df = st.session_state['result_df']
 
-            st.subheader("🔥 일일변동률 히트맵")
+            st.subheader("🔥 변동률 히트맵")
+            
+            # 히트맵 타입 선택
+            heatmap_type = st.radio(
+                "히트맵 유형",
+                ["일일변동률", "누적변동률"],
+                horizontal=True,
+                key="heatmap_type"
+            )
             
             # 필터 옵션
             col1, col2 = st.columns([1, 3])
@@ -1130,20 +1138,29 @@ def main():
                 else:
                     filtered_df = result_df
 
-            # 일일변동률 데이터 수집
+            # 데이터 수집 (선택된 히트맵 타입에 따라)
             heatmap_data = []
             stock_labels = []
             
+            if heatmap_type == "일일변동률":
+                data_column = 'daily_changes'
+                title_text = "일일변동률 히트맵 (시작일~종료일)"
+                metric_label = "일일변동률"
+            else:  # 누적변동률
+                data_column = 'cumulative_returns'
+                title_text = "누적변동률 히트맵 (시작일~종료일)"
+                metric_label = "누적변동률"
+            
             for idx, row in filtered_df.iterrows():
-                if row['daily_changes'] is not None and not row['daily_changes'].empty:
+                if row[data_column] is not None and not row[data_column].empty:
                     stock_label = f"{row['기업명']}({row['티커']})"
                     stock_labels.append(stock_label)
-                    heatmap_data.append(row['daily_changes'].values)
+                    heatmap_data.append(row[data_column].values)
             
             if heatmap_data:
                 # 데이터프레임으로 변환
                 # 모든 종목의 날짜를 통합
-                all_dates = filtered_df[filtered_df['daily_changes'].notna()]['daily_changes'].iloc[0].index
+                all_dates = filtered_df[filtered_df[data_column].notna()][data_column].iloc[0].index
                 
                 heatmap_df = pd.DataFrame(heatmap_data, index=stock_labels)
                 heatmap_df.columns = all_dates
@@ -1166,7 +1183,7 @@ def main():
                 ))
                 
                 fig_heatmap.update_layout(
-                    title="일일변동률 히트맵 (시작일~종료일)",
+                    title=title_text,
                     xaxis_title="날짜",
                     yaxis_title="종목",
                     height=max(int(400 * SCALE), len(stock_labels) * 25),
@@ -1188,8 +1205,8 @@ def main():
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
-                    avg_daily_change = heatmap_df.values.flatten().mean()
-                    st.metric("평균 일일변동률", f"{avg_daily_change:.2f}%")
+                    avg_change = heatmap_df.values.flatten().mean()
+                    st.metric(f"평균 {metric_label}", f"{avg_change:.2f}%")
                 
                 with col2:
                     max_change = heatmap_df.values.flatten().max()
