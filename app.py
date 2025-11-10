@@ -1152,10 +1152,8 @@ def main():
                 title_text = "누적변동률 히트맵 (시작일~종료일)"
                 metric_label = "누적변동률"
             
-            # 섹터별로 정렬된 데이터 수집
-            filtered_df_sorted = filtered_df.sort_values('섹터')
-            
-            for idx, row in filtered_df_sorted.iterrows():
+            # 원본 순서대로 데이터 수집
+            for idx, row in filtered_df.iterrows():
                 if row[data_column] is not None and not row[data_column].empty:
                     stock_label = f"{row['기업명']}({row['티커']})"
                     stock_labels.append(stock_label)
@@ -1165,7 +1163,7 @@ def main():
             if heatmap_data:
                 # 데이터프레임으로 변환
                 # 모든 종목의 날짜를 통합
-                all_dates = filtered_df_sorted[filtered_df_sorted[data_column].notna()][data_column].iloc[0].index
+                all_dates = filtered_df[filtered_df[data_column].notna()][data_column].iloc[0].index
                 
                 heatmap_df = pd.DataFrame(heatmap_data, index=stock_labels)
                 heatmap_df.columns = all_dates
