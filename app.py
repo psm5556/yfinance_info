@@ -90,6 +90,7 @@ def load_portfolio_data():
 백팀,성장자산,미래에너지(재생에너지),Duke Energy,DUK
 백팀,성장자산,미래에너지(재생에너지),GE Vernova,GEV
 백팀,성장자산,미래에너지(재생에너지),NextEra Energy,NEE
+백팀,성장자산,미래에너지(재생에너지),AES Corporation,AES
 백팀,성장자산,미래에너지(재생에너지),Constellation Energy,CEG
 백팀,성장자산,미래에너지(재생에너지),American Electric Power Company,AEP
 백팀,성장자산,미래에너지(재생에너지),Vistra Energy,VST
