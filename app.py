@@ -35,39 +35,27 @@ def load_portfolio_data():
 청팀,기회자산,장수과학,CRISPR Therapeutics,CRSP
 청팀,기회자산,장수과학,Recursion Pharmaceuticals,RXRX
 청팀,기회자산,장수과학,UniQure,QURE
-청팀,기회자산,장수과학,Tempus AI,TEM
-청팀,기회자산,장수과학,HIMS&HERS,HIMS
+청팀,성장자산,장수과학,Tempus AI,TEM
+청팀,성장자산,장수과학,HIMS&HERS,HIMS
+청팀,기회자산,합성생물학,Ginkgo Bioworks,DNA
+청팀,기회자산,합성생물학,Twist Bioscience,TWST
+청팀,기회자산,합성생물학,10x Genomics,TXG
+청팀,기회자산,합성생물학,Appsella Biologics,ABCL
 청팀,기회자산,양자컴퓨터,IonQ,IONQ
 청팀,기회자산,양자컴퓨터,D-Wave Quantum,QBTS
 청팀,기회자산,양자컴퓨터,Rigetti Computing,RGTI
 청팀,기회자산,양자컴퓨터,IBM,IBM
 청팀,기회자산,양자컴퓨터,Quantum Computing,QUBT
-청팀,성장자산,미래에너지(SMR),NuScale Power,SMR
-청팀,성장자산,미래에너지(SMR),Oklo,OKLO
-청팀,성장자산,미래에너지(SMR),BWX Technologies,BWXT
-청팀,성장자산,미래에너지(SMR),Centrus Energy Corp.,LEU
-청팀,성장자산,미래에너지(SMR),Uranium Energy,UEC
-청팀,성장자산,미래에너지(SMR),Cameco (US-listed),CCJ
-청팀,기회자산,합성생물학,Ginkgo Bioworks,DNA
-청팀,기회자산,합성생물학,Twist Bioscience,TWST
-청팀,기회자산,합성생물학,10x Genomics,TXG
-청팀,기회자산,합성생물학,Appsella Biologics,ABCL
 청팀,기회자산,양자 암호,Arqit,ARQQ
 청팀,기회자산,양자 암호,SEALSQ,LAES
 청팀,기회자산,양자 암호,BTQ,BTQ
 청팀,기회자산,BCI,ClearPoint Neuro,CLPT
 청팀,기회자산,BCI,NeuroPace,NPCE
-청팀,성장자산,스테이블코인/핀테크,Coinbase,COIN
-청팀,성장자산,스테이블코인/핀테크,Robinhood,HOOD
-청팀,성장자산,스테이블코인/핀테크,Circle,CRCL
-청팀,성장자산,스테이블코인/핀테크,Block,XYZ
-청팀,성장자산,스테이블코인/핀테크,MicroStrategy,MSTR
-청팀,성장자산,스테이블코인/핀테크,Bitmine Immersion Technologies,BMNR
 백팀,성장자산,AI,Palantir,PLTR
 백팀,성장자산,AI,Salesforce,CRM
-백팀,성장자산,AI,Super Micro Computer, Inc.,SMCI
-백팀,성장자산,AI,Figma, Inc.,FIG
-백팀,성장자산,AI,UiPath, Inc.,PATH
+백팀,성장자산,AI,Super Micro Computer Inc.,SMCI
+백팀,성장자산,AI,Figma Inc.,FIG
+백팀,성장자산,AI,UiPath Inc.,PATH
 백팀,성장자산,AI,Symbotic Inc.,SYM
 백팀,성장자산,클라우드,Nebius Group,NBIS
 백팀,성장자산,클라우드,IREN Limited,IREN
@@ -79,6 +67,12 @@ def load_portfolio_data():
 백팀,성장자산,미래에너지(수소/암모니아),CF Industries,CF
 백팀,성장자산,미래에너지(수소/암모니아),Ballard Power Systems,BLDP
 백팀,성장자산,미래에너지(수소/암모니아),FuelCell Energy,FCEL
+백팀,성장자산,미래에너지(SMR),NuScale Power,SMR
+백팀,성장자산,미래에너지(SMR),Oklo,OKLO
+백팀,성장자산,미래에너지(SMR),BWX Technologies,BWXT
+백팀,성장자산,미래에너지(SMR),Centrus Energy Corp.,LEU
+백팀,성장자산,미래에너지(SMR),Uranium Energy,UEC
+백팀,성장자산,미래에너지(SMR),Cameco (US-listed),CCJ
 백팀,성장자산,미래에너지(전고체배터리),QuantumScape,QS
 백팀,성장자산,미래에너지(전고체배터리),Solid Power,SLDP
 백팀,성장자산,미래에너지(ESS),Fluence Energy,FLNC
@@ -154,12 +148,18 @@ def load_portfolio_data():
 백팀,성장자산,결재시스템,Mastercard,MA
 백팀,성장자산,결재시스템,American Express,AXP
 백팀,성장자산,결재시스템,PayPal,PYPL
-백팀,성장자산,결재시스템,Block,XYZ
-백팀,성장자산,결재시스템,SoFi Technologies,SOFI
-백팀,성장자산,결재시스템,Toast Inc.,TOST
-백팀,성장자산,결재시스템,Affirm Holdings Inc.,AFRM
-백팀,성장자산,결재시스템,Global Payments Inc.,GPN
-백팀,성장자산,결재시스템,Zillow Group Inc.,Z
+백팀,성장자산,결재시스템,Block,SQ
+백팀,성장자산,스테이블코인/핀테크,Coinbase,COIN
+백팀,성장자산,스테이블코인/핀테크,SoFi Technologies,SOFI
+백팀,성장자산,스테이블코인/핀테크,Robinhood,HOOD
+백팀,성장자산,스테이블코인/핀테크,Circle,CRCL
+백팀,성장자산,스테이블코인/핀테크,Block,SQ
+백팀,성장자산,스테이블코인/핀테크,MicroStrategy,MSTR
+백팀,성장자산,스테이블코인/핀테크,Bitmine Immersion Technologies,BMNR
+백팀,성장자산,스테이블코인/핀테크,Toast Inc.,TOST
+백팀,성장자산,스테이블코인/핀테크,Affirm Holdings Inc.,AFRM
+백팀,성장자산,스테이블코인/핀테크,Global Payments Inc.,GPN
+백팀,성장자산,스테이블코인/핀테크,Zillow Group Inc.,Z
 백팀,성장자산,금융/자산운용,BlackRock,BLK
 백팀,성장자산,금융/자산운용,JPMorgan Chase,JPM
 백팀,성장자산,금융/자산운용,Morgan Stanley,MS
@@ -171,17 +171,17 @@ def load_portfolio_data():
 백팀,성장자산,금융/자산운용,CME Group Inc.,CME
 백팀,성장자산,금융/자산운용,Bank of New York Mellon,BK
 백팀,성장자산,명품소비재,Ferrari N.V.,RACE
-백팀,성장자산,명품소비재,Williams-Sonoma, Inc.,WSM
+백팀,성장자산,명품소비재,Williams-Sonoma Inc.,WSM
 백팀,성장자산,명품소비재,Tapestry,TPR
 백팀,성장자산,명품소비재,Estée Lauder,EL
 백팀,성장자산,명품소비재,Lululemon Athletica,LULU
 백팀,성장자산,명품소비재,Cullen/Frost Bankers,CFR
-백팀,성장자산,명품소비재,Old Republic Intl,OR
+백팀,성장자산,명품소비재,Old Republic Intl,ORI
 백팀,성장자산,명품소비재,LVMH Moët Hennessy Louis Vuitton,MC
 백팀,성장자산,명품소비재,Brunswick Corporation,BC
 백팀,성장자산,명품소비재,LVMH Moët Hennessy Louis Vuitton,LVMUY
 백팀,성장자산,명품소비재,Ralph Lauren,RL
-백팀,성장자산,명품소비재,Capri Holdings*,CPRI
+백팀,성장자산,명품소비재,Capri Holdings,CPRI
 백팀,성장자산,명품소비재,Canada Goose,GOOS
 백팀,성장자산,헬스케어,UnitedHealth,UNH
 백팀,성장자산,헬스케어,Natera,NTRA
