@@ -22,183 +22,182 @@ st.set_page_config(page_title="투자 포트폴리오 대시보드", layout="wid
 @st.cache_data
 def load_portfolio_data():
     data = """팀,자산,섹터,기업명,티커
-    청팀,기회자산,우주경제,Rocket Lab,RKLB
-    청팀,기회자산,우주경제,Lockheed Martin,LMT
-    청팀,기회자산,우주경제,Raytheon Technologies Corporation,RTX
-    청팀,기회자산,우주경제,Boeing,BA
-    청팀,기회자산,우주경제,Northrop Grumman,NOC
-    청팀,기회자산,우주경제,AST SpaceMobile,ASTS
-    청팀,기회자산,우주경제,Virgin Galactic,SPCE
-    청팀,기회자산,우주경제,JOBY Aviation,JOBY
-    청팀,기회자산,우주경제,Archer Aviation,ACHR
-    청팀,기회자산,장수과학,Intellia Therapeutics,NTLA
-    청팀,기회자산,장수과학,CRISPR Therapeutics,CRSP
-    청팀,기회자산,장수과학,Recursion Pharmaceuticals,RXRX
-    청팀,기회자산,장수과학,UniQure,QURE
-    청팀,기회자산,장수과학,Tempus AI,TEM
-    청팀,기회자산,장수과학,HIMS&HERS,HIMS
-    청팀,기회자산,양자컴퓨터,IonQ,IONQ
-    청팀,기회자산,양자컴퓨터,D-Wave Quantum,QBTS
-    청팀,기회자산,양자컴퓨터,Rigetti Computing,RGTI
-    청팀,기회자산,양자컴퓨터,IBM,IBM
-    청팀,기회자산,양자컴퓨터,Quantum Computing,QUBT
-    청팀,성장자산,미래에너지(SMR),NuScale Power,SMR
-    청팀,성장자산,미래에너지(SMR),Oklo,OKLO
-    청팀,성장자산,미래에너지(SMR),BWX Technologies,BWXT
-    청팀,성장자산,미래에너지(SMR),Centrus Energy Corp.,LEU
-    청팀,성장자산,미래에너지(SMR),Uranium Energy,UEC
-    청팀,성장자산,미래에너지(SMR),Cameco (US-listed),CCJ
-    청팀,기회자산,합성생물학,Ginkgo Bioworks,DNA
-    청팀,기회자산,합성생물학,Twist Bioscience,TWST
-    청팀,기회자산,합성생물학,10x Genomics,TXG
-    청팀,기회자산,합성생물학,Appsella Biologics,ABCL
-    청팀,기회자산,양자 암호,Arqit,ARQQ
-    청팀,기회자산,양자 암호,SEALSQ,LAES
-    청팀,기회자산,양자 암호,BTQ,BTQ
-    청팀,기회자산,BCI,ClearPoint Neuro,CLPT
-    청팀,기회자산,BCI,NeuroPace,NPCE
-    청팀,성장자산,스테이블코인/핀테크,Coinbase,COIN
-    청팀,성장자산,스테이블코인/핀테크,Robinhood,HOOD
-    청팀,성장자산,스테이블코인/핀테크,Circle,CRCL
-    청팀,성장자산,스테이블코인/핀테크,Block,XYZ
-    청팀,성장자산,스테이블코인/핀테크,MicroStrategy,MSTR
-    청팀,성장자산,스테이블코인/핀테크,Bitmine Immersion Technologies,BMNR
-    백팀,성장자산,AI,Palantir,PLTR
-    백팀,성장자산,AI,Salesforce,CRM
-    백팀,성장자산,AI,Super Micro Computer, Inc.,SMCI
-    백팀,성장자산,AI,Figma, Inc.,FIG
-    백팀,성장자산,AI,UiPath, Inc.,PATH
-    백팀,성장자산,AI,Symbotic Inc.,SYM
-    백팀,성장자산,클라우드,Nebius Group,NBIS
-    백팀,성장자산,클라우드,IREN Limited,IREN
-    백팀,성장자산,클라우드,CoreWeave,CRWV
-    백팀,성장자산,미래에너지(수소/암모니아),Bloom Energy,BE
-    백팀,성장자산,미래에너지(수소/암모니아),Plug Power,PLUG
-    백팀,성장자산,미래에너지(수소/암모니아),Air Products,APD
-    백팀,성장자산,미래에너지(수소/암모니아),Linde,LIN
-    백팀,성장자산,미래에너지(수소/암모니아),CF Industries,CF
-    백팀,성장자산,미래에너지(수소/암모니아),Ballard Power Systems,BLDP
-    백팀,성장자산,미래에너지(수소/암모니아),FuelCell Energy,FCEL
-    백팀,성장자산,미래에너지(전고체배터리),QuantumScape,QS
-    백팀,성장자산,미래에너지(전고체배터리),Solid Power,SLDP
-    백팀,성장자산,미래에너지(ESS),Fluence Energy,FLNC
-    백팀,성장자산,미래에너지(ESS),EnerSys,ENS
-    백팀,성장자산,미래에너지(ESS),Eos Energy Enterprises,EOSE
-    백팀,성장자산,미래에너지(ESS),Tesla (Energy),TSLA
-    백팀,성장자산,미래에너지(ESS),Enphase Energy,ENPH
-    백팀,성장자산,미래에너지(ESS),Eaton,ETN
-    백팀,성장자산,미래에너지(재생에너지),Duke Energy,DUK
-    백팀,성장자산,미래에너지(재생에너지),GE Vernova,GEV
-    백팀,성장자산,미래에너지(재생에너지),NextEra Energy,NEE
-    백팀,성장자산,미래에너지(재생에너지),Constellation Energy,CEG
-    백팀,성장자산,미래에너지(재생에너지),American Electric Power Company,AEP
-    백팀,성장자산,미래에너지(재생에너지),Vistra Energy,VST
-    백팀,성장자산,미래에너지(재생에너지),First Solar,FSLR
-    백팀,성장자산,전통에너지,Exxon Mobil,XOM
-    백팀,성장자산,전통에너지,Chevron,CVX
-    백팀,성장자산,전통에너지,Marathon Petroleum,MPC
-    백팀,성장자산,전통에너지,Shell plc,SHEL
-    백팀,성장자산,전통에너지,ConocoPhillips,COP
-    백팀,성장자산,전통에너지,Occidental Petroleum,OXY
-    백팀,성장자산,전통에너지,Devon Energy,DVN
-    백팀,성장자산,전통에너지,Valero Energy,VLO
-    백팀,성장자산,전통에너지,Southern Company,SO
-    백팀,성장자산,데이터 인프라(냉각),Vertiv,VRT
-    백팀,성장자산,데이터 인프라(냉각),Carrier Global,CARR
-    백팀,성장자산,데이터 인프라(냉각),Honeywell International,HON
-    백팀,성장자산,데이터 인프라(냉각),Johnson Controls,JCI
-    백팀,성장자산,데이터 인프라(네트워크),Arista Networks,ANET
-    백팀,성장자산,데이터 인프라(네트워크),Credo,CRDO
-    백팀,성장자산,데이터 인프라(네트워크),Astera Labs,ALAB
-    백팀,성장자산,데이터 인프라(네트워크),Marvell Technology,MRVL
-    백팀,성장자산,데이터 인프라(네트워크),Hewlett Packard Enterprise,HPE
-    백팀,성장자산,데이터 인프라(네트워크),Cisco,CSCO
-    백팀,성장자산,데이터 인프라(네트워크),Ciena,CIEN
-    백팀,성장자산,데이터 인프라(로직반도체),NVIDIA,NVDA
-    백팀,성장자산,데이터 인프라(로직반도체),Micron Technology,MU
-    백팀,성장자산,데이터 인프라(로직반도체),AMD,AMD
-    백팀,성장자산,데이터 인프라(로직반도체),Intel,INTC
-    백팀,성장자산,데이터 인프라(로직반도체),Broadcom,AVGO
-    백팀,성장자산,데이터 인프라(로직반도체),TSMC,TSM
-    백팀,성장자산,데이터 인프라(로직반도체),Lam Research,LRCX
-    백팀,성장자산,데이터 인프라(로직반도체),On Semiconductor,ON
-    백팀,성장자산,데이터 인프라(로직반도체),Synopsys,SNPS
-    백팀,성장자산,데이터 인프라(하이퍼스케일),Amazon (AWS),AMZN
-    백팀,성장자산,데이터 인프라(하이퍼스케일),Microsoft (Azure),MSFT
-    백팀,성장자산,데이터 인프라(하이퍼스케일),Alphabet (GCP),GOOGL
-    백팀,성장자산,데이터 인프라(하이퍼스케일),Meta Platforms,META
-    백팀,성장자산,데이터 인프라(하이퍼스케일),Apple,AAPL
-    백팀,성장자산,데이터 인프라(하이퍼스케일),Oracle Cloud,ORCL
-    백팀,성장자산,데이터 인프라(하이퍼스케일),Pure Storage,PSTG
-    백팀,성장자산,데이터 인프라(리츠),Equinix,EQIX
-    백팀,성장자산,데이터 인프라(리츠),Digital Realty,DLR
-    백팀,성장자산,데이터 인프라(리츠),CyrusOne,CONE
-    백팀,성장자산,데이터 인프라(리츠),Continental Building Co.,CONL
-    백팀,성장자산,사이버보안,Palo Alto Networks,PANW
-    백팀,성장자산,사이버보안,CrowdStrike,CRWD
-    백팀,성장자산,사이버보안,Zscaler,ZS
-    백팀,성장자산,필수소비재,Kenvue Inc.,KVUE
-    백팀,성장자산,필수소비재,Procter & Gamble,PG
-    백팀,성장자산,필수소비재,Coca-Cola,KO
-    백팀,성장자산,필수소비재,PepsiCo,PEP
-    백팀,성장자산,필수소비재,Walmart,WMT
-    백팀,성장자산,필수소비재,Costco,COST
-    백팀,성장자산,필수소비재,Colgate-Palmolive,CL
-    백팀,성장자산,필수소비재,Kimberly-Clark,KMB
-    백팀,성장자산,필수소비재,Target Corporation,TGT
-    백팀,성장자산,필수소비재,Philip Morris Intl,PM
-    백팀,성장자산,필수소비재,Unilever PLC,UL
-    백팀,성장자산,필수소비재,Altria Group Inc,MO
-    백팀,성장자산,필수소비재,3M Company,MMM
-    백팀,성장자산,결재시스템,Visa,V
-    백팀,성장자산,결재시스템,Mastercard,MA
-    백팀,성장자산,결재시스템,American Express,AXP
-    백팀,성장자산,결재시스템,PayPal,PYPL
-    백팀,성장자산,결재시스템,Block,XYZ
-    백팀,성장자산,결재시스템,SoFi Technologies,SOFI
-    백팀,성장자산,결재시스템,Toast Inc.,TOST
-    백팀,성장자산,결재시스템,Affirm Holdings Inc.,AFRM
-    백팀,성장자산,결재시스템,Global Payments Inc.,GPN
-    백팀,성장자산,결재시스템,Zillow Group Inc.,Z
-    백팀,성장자산,금융/자산운용,BlackRock,BLK
-    백팀,성장자산,금융/자산운용,JPMorgan Chase,JPM
-    백팀,성장자산,금융/자산운용,Morgan Stanley,MS
-    백팀,성장자산,금융/자산운용,Goldman Sachs,GS
-    백팀,성장자산,금융/자산운용,Bank of America,BAC
-    백팀,성장자산,금융/자산운용,Citi Group,C
-    백팀,성장자산,금융/자산운용,HSBC Holdings,HSBC
-    백팀,성장자산,금융/자산운용,Blackstone Inc.,BX
-    백팀,성장자산,금융/자산운용,CME Group Inc.,CME
-    백팀,성장자산,금융/자산운용,Bank of New York Mellon,BK
-    백팀,성장자산,명품소비재,Ferrari N.V.,RACE
-    백팀,성장자산,명품소비재,Williams-Sonoma, Inc.,WSM
-    백팀,성장자산,명품소비재,Tapestry,TPR
-    백팀,성장자산,명품소비재,Estée Lauder,EL
-    백팀,성장자산,명품소비재,Lululemon Athletica,LULU
-    백팀,성장자산,명품소비재,Cullen/Frost Bankers,CFR
-    백팀,성장자산,명품소비재,Old Republic Intl,OR
-    백팀,성장자산,명품소비재,LVMH Moët Hennessy Louis Vuitton,MC
-    백팀,성장자산,명품소비재,Brunswick Corporation,BC
-    백팀,성장자산,명품소비재,LVMH Moët Hennessy Louis Vuitton,LVMUY
-    백팀,성장자산,명품소비재,Ralph Lauren,RL
-    백팀,성장자산,명품소비재,Capri Holdings*,CPRI
-    백팀,성장자산,명품소비재,Canada Goose,GOOS
-    백팀,성장자산,헬스케어,UnitedHealth,UNH
-    백팀,성장자산,헬스케어,Natera,NTRA
-    백팀,성장자산,헬스케어,Johnson & Johnson,JNJ
-    백팀,성장자산,헬스케어,Thermo Fisher,TMO
-    백팀,성장자산,헬스케어,Abbott Labs,ABT
-    백팀,성장자산,헬스케어,Intuitive Surgical,ISRG
-    백팀,성장자산,헬스케어,Pfizer,PFE
-    백팀,성장자산,헬스케어,Merck & Co.,MRK
-    백팀,성장자산,헬스케어,Moderna,MRNA
-    백팀,성장자산,헬스케어,Eli Lilly,LLY
-    백팀,성장자산,물&식량,Xylem,XYL
-    백팀,성장자산,물&식량,Ecolab,ECL
-    백팀,성장자산,물&식량,American Water Works,AWK
-    백팀,성장자산,물&식량,DuPont,DD
-    백팀,성장자산,물&식량,Nestlé,NSRGY
-    """
+청팀,기회자산,우주경제,Rocket Lab,RKLB
+청팀,기회자산,우주경제,Lockheed Martin,LMT
+청팀,기회자산,우주경제,Raytheon Technologies Corporation,RTX
+청팀,기회자산,우주경제,Boeing,BA
+청팀,기회자산,우주경제,Northrop Grumman,NOC
+청팀,기회자산,우주경제,AST SpaceMobile,ASTS
+청팀,기회자산,우주경제,Virgin Galactic,SPCE
+청팀,기회자산,우주경제,JOBY Aviation,JOBY
+청팀,기회자산,우주경제,Archer Aviation,ACHR
+청팀,기회자산,장수과학,Intellia Therapeutics,NTLA
+청팀,기회자산,장수과학,CRISPR Therapeutics,CRSP
+청팀,기회자산,장수과학,Recursion Pharmaceuticals,RXRX
+청팀,기회자산,장수과학,UniQure,QURE
+청팀,기회자산,장수과학,Tempus AI,TEM
+청팀,기회자산,장수과학,HIMS&HERS,HIMS
+청팀,기회자산,양자컴퓨터,IonQ,IONQ
+청팀,기회자산,양자컴퓨터,D-Wave Quantum,QBTS
+청팀,기회자산,양자컴퓨터,Rigetti Computing,RGTI
+청팀,기회자산,양자컴퓨터,IBM,IBM
+청팀,기회자산,양자컴퓨터,Quantum Computing,QUBT
+청팀,성장자산,미래에너지(SMR),NuScale Power,SMR
+청팀,성장자산,미래에너지(SMR),Oklo,OKLO
+청팀,성장자산,미래에너지(SMR),BWX Technologies,BWXT
+청팀,성장자산,미래에너지(SMR),Centrus Energy Corp.,LEU
+청팀,성장자산,미래에너지(SMR),Uranium Energy,UEC
+청팀,성장자산,미래에너지(SMR),Cameco (US-listed),CCJ
+청팀,기회자산,합성생물학,Ginkgo Bioworks,DNA
+청팀,기회자산,합성생물학,Twist Bioscience,TWST
+청팀,기회자산,합성생물학,10x Genomics,TXG
+청팀,기회자산,합성생물학,Appsella Biologics,ABCL
+청팀,기회자산,양자 암호,Arqit,ARQQ
+청팀,기회자산,양자 암호,SEALSQ,LAES
+청팀,기회자산,양자 암호,BTQ,BTQ
+청팀,기회자산,BCI,ClearPoint Neuro,CLPT
+청팀,기회자산,BCI,NeuroPace,NPCE
+청팀,성장자산,스테이블코인/핀테크,Coinbase,COIN
+청팀,성장자산,스테이블코인/핀테크,Robinhood,HOOD
+청팀,성장자산,스테이블코인/핀테크,Circle,CRCL
+청팀,성장자산,스테이블코인/핀테크,Block,XYZ
+청팀,성장자산,스테이블코인/핀테크,MicroStrategy,MSTR
+청팀,성장자산,스테이블코인/핀테크,Bitmine Immersion Technologies,BMNR
+백팀,성장자산,AI,Palantir,PLTR
+백팀,성장자산,AI,Salesforce,CRM
+백팀,성장자산,AI,Super Micro Computer, Inc.,SMCI
+백팀,성장자산,AI,Figma, Inc.,FIG
+백팀,성장자산,AI,UiPath, Inc.,PATH
+백팀,성장자산,AI,Symbotic Inc.,SYM
+백팀,성장자산,클라우드,Nebius Group,NBIS
+백팀,성장자산,클라우드,IREN Limited,IREN
+백팀,성장자산,클라우드,CoreWeave,CRWV
+백팀,성장자산,미래에너지(수소/암모니아),Bloom Energy,BE
+백팀,성장자산,미래에너지(수소/암모니아),Plug Power,PLUG
+백팀,성장자산,미래에너지(수소/암모니아),Air Products,APD
+백팀,성장자산,미래에너지(수소/암모니아),Linde,LIN
+백팀,성장자산,미래에너지(수소/암모니아),CF Industries,CF
+백팀,성장자산,미래에너지(수소/암모니아),Ballard Power Systems,BLDP
+백팀,성장자산,미래에너지(수소/암모니아),FuelCell Energy,FCEL
+백팀,성장자산,미래에너지(전고체배터리),QuantumScape,QS
+백팀,성장자산,미래에너지(전고체배터리),Solid Power,SLDP
+백팀,성장자산,미래에너지(ESS),Fluence Energy,FLNC
+백팀,성장자산,미래에너지(ESS),EnerSys,ENS
+백팀,성장자산,미래에너지(ESS),Eos Energy Enterprises,EOSE
+백팀,성장자산,미래에너지(ESS),Tesla (Energy),TSLA
+백팀,성장자산,미래에너지(ESS),Enphase Energy,ENPH
+백팀,성장자산,미래에너지(ESS),Eaton,ETN
+백팀,성장자산,미래에너지(재생에너지),Duke Energy,DUK
+백팀,성장자산,미래에너지(재생에너지),GE Vernova,GEV
+백팀,성장자산,미래에너지(재생에너지),NextEra Energy,NEE
+백팀,성장자산,미래에너지(재생에너지),Constellation Energy,CEG
+백팀,성장자산,미래에너지(재생에너지),American Electric Power Company,AEP
+백팀,성장자산,미래에너지(재생에너지),Vistra Energy,VST
+백팀,성장자산,미래에너지(재생에너지),First Solar,FSLR
+백팀,성장자산,전통에너지,Exxon Mobil,XOM
+백팀,성장자산,전통에너지,Chevron,CVX
+백팀,성장자산,전통에너지,Marathon Petroleum,MPC
+백팀,성장자산,전통에너지,Shell plc,SHEL
+백팀,성장자산,전통에너지,ConocoPhillips,COP
+백팀,성장자산,전통에너지,Occidental Petroleum,OXY
+백팀,성장자산,전통에너지,Devon Energy,DVN
+백팀,성장자산,전통에너지,Valero Energy,VLO
+백팀,성장자산,전통에너지,Southern Company,SO
+백팀,성장자산,데이터 인프라(냉각),Vertiv,VRT
+백팀,성장자산,데이터 인프라(냉각),Carrier Global,CARR
+백팀,성장자산,데이터 인프라(냉각),Honeywell International,HON
+백팀,성장자산,데이터 인프라(냉각),Johnson Controls,JCI
+백팀,성장자산,데이터 인프라(네트워크),Arista Networks,ANET
+백팀,성장자산,데이터 인프라(네트워크),Credo,CRDO
+백팀,성장자산,데이터 인프라(네트워크),Astera Labs,ALAB
+백팀,성장자산,데이터 인프라(네트워크),Marvell Technology,MRVL
+백팀,성장자산,데이터 인프라(네트워크),Hewlett Packard Enterprise,HPE
+백팀,성장자산,데이터 인프라(네트워크),Cisco,CSCO
+백팀,성장자산,데이터 인프라(네트워크),Ciena,CIEN
+백팀,성장자산,데이터 인프라(로직반도체),NVIDIA,NVDA
+백팀,성장자산,데이터 인프라(로직반도체),Micron Technology,MU
+백팀,성장자산,데이터 인프라(로직반도체),AMD,AMD
+백팀,성장자산,데이터 인프라(로직반도체),Intel,INTC
+백팀,성장자산,데이터 인프라(로직반도체),Broadcom,AVGO
+백팀,성장자산,데이터 인프라(로직반도체),TSMC,TSM
+백팀,성장자산,데이터 인프라(로직반도체),Lam Research,LRCX
+백팀,성장자산,데이터 인프라(로직반도체),On Semiconductor,ON
+백팀,성장자산,데이터 인프라(로직반도체),Synopsys,SNPS
+백팀,성장자산,데이터 인프라(하이퍼스케일),Amazon (AWS),AMZN
+백팀,성장자산,데이터 인프라(하이퍼스케일),Microsoft (Azure),MSFT
+백팀,성장자산,데이터 인프라(하이퍼스케일),Alphabet (GCP),GOOGL
+백팀,성장자산,데이터 인프라(하이퍼스케일),Meta Platforms,META
+백팀,성장자산,데이터 인프라(하이퍼스케일),Apple,AAPL
+백팀,성장자산,데이터 인프라(하이퍼스케일),Oracle Cloud,ORCL
+백팀,성장자산,데이터 인프라(하이퍼스케일),Pure Storage,PSTG
+백팀,성장자산,데이터 인프라(리츠),Equinix,EQIX
+백팀,성장자산,데이터 인프라(리츠),Digital Realty,DLR
+백팀,성장자산,데이터 인프라(리츠),CyrusOne,CONE
+백팀,성장자산,데이터 인프라(리츠),Continental Building Co.,CONL
+백팀,성장자산,사이버보안,Palo Alto Networks,PANW
+백팀,성장자산,사이버보안,CrowdStrike,CRWD
+백팀,성장자산,사이버보안,Zscaler,ZS
+백팀,성장자산,필수소비재,Kenvue Inc.,KVUE
+백팀,성장자산,필수소비재,Procter & Gamble,PG
+백팀,성장자산,필수소비재,Coca-Cola,KO
+백팀,성장자산,필수소비재,PepsiCo,PEP
+백팀,성장자산,필수소비재,Walmart,WMT
+백팀,성장자산,필수소비재,Costco,COST
+백팀,성장자산,필수소비재,Colgate-Palmolive,CL
+백팀,성장자산,필수소비재,Kimberly-Clark,KMB
+백팀,성장자산,필수소비재,Target Corporation,TGT
+백팀,성장자산,필수소비재,Philip Morris Intl,PM
+백팀,성장자산,필수소비재,Unilever PLC,UL
+백팀,성장자산,필수소비재,Altria Group Inc,MO
+백팀,성장자산,필수소비재,3M Company,MMM
+백팀,성장자산,결재시스템,Visa,V
+백팀,성장자산,결재시스템,Mastercard,MA
+백팀,성장자산,결재시스템,American Express,AXP
+백팀,성장자산,결재시스템,PayPal,PYPL
+백팀,성장자산,결재시스템,Block,XYZ
+백팀,성장자산,결재시스템,SoFi Technologies,SOFI
+백팀,성장자산,결재시스템,Toast Inc.,TOST
+백팀,성장자산,결재시스템,Affirm Holdings Inc.,AFRM
+백팀,성장자산,결재시스템,Global Payments Inc.,GPN
+백팀,성장자산,결재시스템,Zillow Group Inc.,Z
+백팀,성장자산,금융/자산운용,BlackRock,BLK
+백팀,성장자산,금융/자산운용,JPMorgan Chase,JPM
+백팀,성장자산,금융/자산운용,Morgan Stanley,MS
+백팀,성장자산,금융/자산운용,Goldman Sachs,GS
+백팀,성장자산,금융/자산운용,Bank of America,BAC
+백팀,성장자산,금융/자산운용,Citi Group,C
+백팀,성장자산,금융/자산운용,HSBC Holdings,HSBC
+백팀,성장자산,금융/자산운용,Blackstone Inc.,BX
+백팀,성장자산,금융/자산운용,CME Group Inc.,CME
+백팀,성장자산,금융/자산운용,Bank of New York Mellon,BK
+백팀,성장자산,명품소비재,Ferrari N.V.,RACE
+백팀,성장자산,명품소비재,Williams-Sonoma, Inc.,WSM
+백팀,성장자산,명품소비재,Tapestry,TPR
+백팀,성장자산,명품소비재,Estée Lauder,EL
+백팀,성장자산,명품소비재,Lululemon Athletica,LULU
+백팀,성장자산,명품소비재,Cullen/Frost Bankers,CFR
+백팀,성장자산,명품소비재,Old Republic Intl,OR
+백팀,성장자산,명품소비재,LVMH Moët Hennessy Louis Vuitton,MC
+백팀,성장자산,명품소비재,Brunswick Corporation,BC
+백팀,성장자산,명품소비재,LVMH Moët Hennessy Louis Vuitton,LVMUY
+백팀,성장자산,명품소비재,Ralph Lauren,RL
+백팀,성장자산,명품소비재,Capri Holdings*,CPRI
+백팀,성장자산,명품소비재,Canada Goose,GOOS
+백팀,성장자산,헬스케어,UnitedHealth,UNH
+백팀,성장자산,헬스케어,Natera,NTRA
+백팀,성장자산,헬스케어,Johnson & Johnson,JNJ
+백팀,성장자산,헬스케어,Thermo Fisher,TMO
+백팀,성장자산,헬스케어,Abbott Labs,ABT
+백팀,성장자산,헬스케어,Intuitive Surgical,ISRG
+백팀,성장자산,헬스케어,Pfizer,PFE
+백팀,성장자산,헬스케어,Merck & Co.,MRK
+백팀,성장자산,헬스케어,Moderna,MRNA
+백팀,성장자산,헬스케어,Eli Lilly,LLY
+백팀,성장자산,물&식량,Xylem,XYL
+백팀,성장자산,물&식량,Ecolab,ECL
+백팀,성장자산,물&식량,American Water Works,AWK
+백팀,성장자산,물&식량,DuPont,DD
+백팀,성장자산,물&식량,Nestlé,NSRGY"""
 
     from io import StringIO
     df = pd.read_csv(StringIO(data))
