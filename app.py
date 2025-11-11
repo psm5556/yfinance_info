@@ -41,11 +41,6 @@ def load_portfolio_data():
 청팀,기회자산,합성생물학,Twist Bioscience,TWST
 청팀,기회자산,합성생물학,10x Genomics,TXG
 청팀,기회자산,합성생물학,Appsella Biologics,ABCL
-청팀,기회자산,양자컴퓨터,IonQ,IONQ
-청팀,기회자산,양자컴퓨터,D-Wave Quantum,QBTS
-청팀,기회자산,양자컴퓨터,Rigetti Computing,RGTI
-청팀,기회자산,양자컴퓨터,IBM,IBM
-청팀,기회자산,양자컴퓨터,Quantum Computing,QUBT
 청팀,기회자산,양자 암호,Arqit,ARQQ
 청팀,기회자산,양자 암호,SEALSQ,LAES
 청팀,기회자산,양자 암호,BTQ,BTQ
