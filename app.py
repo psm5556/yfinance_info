@@ -201,12 +201,10 @@ def load_portfolio_data():
 
     from io import StringIO
     # df = pd.read_csv(StringIO(data))
-    # If your data uses different delimiters inconsistently
     df = pd.read_csv(
         StringIO(data),
-        sep=',',              # Explicitly set delimiter
-        quotechar='"',        # Handle quoted fields
-        skipinitialspace=True # Ignore spaces after delimiter
+        on_bad_lines='skip',  # Skip problematic rows
+        engine='python'       # Use Python engine (more forgiving)
     )
     return df
 
