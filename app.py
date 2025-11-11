@@ -200,7 +200,14 @@ def load_portfolio_data():
 백팀,성장자산,물&식량,Nestlé,NSRGY"""
 
     from io import StringIO
-    df = pd.read_csv(StringIO(data))
+    # df = pd.read_csv(StringIO(data))
+    # If your data uses different delimiters inconsistently
+    df = pd.read_csv(
+        StringIO(data),
+        sep=',',              # Explicitly set delimiter
+        quotechar='"',        # Handle quoted fields
+        skipinitialspace=True # Ignore spaces after delimiter
+    )
     return df
 
 
