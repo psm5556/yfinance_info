@@ -34,6 +34,7 @@ def load_portfolio_data():
 청팀,기회자산,장수과학,Intellia Therapeutics,NTLA
 청팀,기회자산,장수과학,CRISPR Therapeutics,CRSP
 청팀,기회자산,장수과학,Recursion Pharmaceuticals,RXRX
+청팀,기회자산,장수과학,Beam Therapeutics,BEAM
 청팀,기회자산,장수과학,UniQure,QURE
 청팀,기회자산,장수과학,Tempus AI,TEM
 청팀,기회자산,장수과학,HIMS&HERS,HIMS
