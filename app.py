@@ -59,6 +59,8 @@ def load_portfolio_data():
 청팀,기회자산,양자 암호,BTQ,BTQ
 청팀,기회자산,BCI,ClearPoint Neuro,CLPT
 청팀,기회자산,BCI,NeuroPace,NPCE
+청팀,기회자산,무선 전력 전송 플랫폼,Energous Corporation,WATT
+청팀,기회자산,대기 물 수,AirJoule Technologies Corporation,AIRJ
 청팀,성장자산,스테이블코인/핀테크,Coinbase,COIN
 청팀,성장자산,스테이블코인/핀테크,Robinhood,HOOD
 청팀,성장자산,스테이블코인/핀테크,Circle,CRCL
