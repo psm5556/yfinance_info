@@ -67,7 +67,8 @@ def load_portfolio_data():
 청팀,성장자산,스테이블코인/핀테크,Bitmine Immersion Technologies,BMNR
 백팀,성장자산,AI,Palantir,PLTR
 백팀,성장자산,AI,Salesforce,CRM
-백팀,성장자산,AI,Super Micro Computer, Inc.,SMCI
+백팀,성장자산,AI,Super Micro Computer,SMCI
+백팀,성장자산,AI,AppLovin,APP
 백팀,성장자산,AI,Figma, Inc.,FIG
 백팀,성장자산,AI,UiPath, Inc.,PATH
 백팀,성장자산,AI,Symbotic Inc.,SYM
