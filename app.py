@@ -456,6 +456,26 @@ def highlight_low_debt_ratio(val):
         return ""
     return ""
 
+def highlight_market_cap(val):
+    """시가총액이 100B 이하면 녹색으로 표시"""
+    try:
+        if isinstance(val, str) and val != "-":
+            # "150.5B", "1.2T" 같은 형식 파싱
+            val_str = val.strip()
+            if val_str.endswith('T'):
+                # Trillion은 항상 100B 초과
+                return ""
+            elif val_str.endswith('B'):
+                num = float(val_str[:-1])
+                if num <= 100:
+                    return "background-color: lightgreen"
+            elif val_str.endswith('M'):
+                # Million은 항상 100B 미만
+                return "background-color: lightgreen"
+    except:
+        return ""
+    return ""
+
 # 개별 종목 차트 표시 함수
 def display_stock_chart(selected_data, start_date):
     """선택된 종목의 상세 차트를 표시"""
@@ -833,6 +853,11 @@ def main():
             # 표시용 DataFrame 생성
             display_df = st.session_state['result_df'][display_columns].copy()
             
+            # Finviz 링크 컬럼 추가
+            display_df['Finviz'] = display_df['티커'].apply(
+                lambda ticker: f"https://finviz.com/quote.ashx?t={ticker}&p=d"
+            )
+            
             # 숫자 컬럼 포맷팅 (소수점 2자리) - 시가총액 제외
             float_cols = [
                 '기준가', '최고가', '현재가',
@@ -870,6 +895,7 @@ def main():
                 .map(highlight_positive_negative,
                      subset=["누적수익률(기준가)", "누적수익률(최고가)", "일일수익", "일일수익률", "ROE"])
                 .map(highlight_low_debt_ratio, subset=["부채비율"])
+                .map(highlight_market_cap, subset=["시가총액"])
             )
             
             # 테이블 표시 (편집 가능)
@@ -890,10 +916,10 @@ def main():
                         help="차트를 보고 싶은 종목을 선택하세요 (단일 선택)",
                         default=False,
                     ),
-                    "티커": st.column_config.LinkColumn(
-                        "티커",
+                    "Finviz": st.column_config.LinkColumn(
+                        "Finviz",
                         help="Finviz 차트 보기",
-                        display_text="https://finviz.com/quote.ashx?t=(.*)&p=d"
+                        width="small"
                     )
                 },
                 disabled=[col for col in display_df.columns if col not in ['선택']],
