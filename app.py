@@ -122,8 +122,8 @@ def load_portfolio_data():
 백팀,성장자산,데이터 인프라(로직반도체),Intel,INTC
 백팀,성장자산,데이터 인프라(로직반도체),Broadcom,AVGO
 백팀,성장자산,데이터 인프라(로직반도체),TSMC,TSM
-백팀,성장자산,데이터 인프라(로직반도체),Analog Devices, Inc.,ADI
-백팀,성장자산,데이터 인프라(로직반도체),Wolfspeed, Inc.,WOLF
+백팀,성장자산,데이터 인프라(로직반도체),Analog Devices,ADI
+백팀,성장자산,데이터 인프라(로직반도체),Wolfspeed,WOLF
 백팀,성장자산,데이터 인프라(로직반도체),Lam Research,LRCX
 백팀,성장자산,데이터 인프라(로직반도체),On Semiconductor,ON
 백팀,성장자산,데이터 인프라(로직반도체),Synopsys,SNPS
