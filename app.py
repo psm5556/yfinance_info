@@ -154,6 +154,7 @@ def load_portfolio_data():
 백팀,성장자산,필수소비재,Colgate-Palmolive,CL
 백팀,성장자산,필수소비재,Kimberly-Clark,KMB
 백팀,성장자산,필수소비재,Target Corporation,TGT
+백팀,성장자산,필수소비재,Kraft Heinz Co,KHC
 백팀,성장자산,필수소비재,Philip Morris Intl,PM
 백팀,성장자산,필수소비재,Unilever PLC,UL
 백팀,성장자산,필수소비재,Altria Group Inc,MO
@@ -178,6 +179,7 @@ def load_portfolio_data():
 백팀,성장자산,금융/자산운용,Blackstone Inc.,BX
 백팀,성장자산,금융/자산운용,CME Group Inc.,CME
 백팀,성장자산,금융/자산운용,Bank of New York Mellon,BK
+백팀,성장자산,금융/자산운용,Chubb Limited,CB
 백팀,성장자산,명품소비재,Ferrari N.V.,RACE
 백팀,성장자산,명품소비재,Williams-Sonoma Inc.,WSM
 백팀,성장자산,명품소비재,Tapestry,TPR
