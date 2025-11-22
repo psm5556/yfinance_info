@@ -69,8 +69,9 @@ def load_portfolio_data():
 백팀,성장자산,AI,Salesforce,CRM
 백팀,성장자산,AI,Super Micro Computer,SMCI
 백팀,성장자산,AI,AppLovin,APP
-백팀,성장자산,AI,Figma, Inc.,FIG
-백팀,성장자산,AI,UiPath, Inc.,PATH
+백팀,성장자산,AI,Datadog,DDOG
+백팀,성장자산,AI,Figma Inc.,FIG
+백팀,성장자산,AI,UiPath Inc.,PATH
 백팀,성장자산,AI,Symbotic Inc.,SYM
 백팀,성장자산,클라우드,Nebius Group,NBIS
 백팀,성장자산,클라우드,IREN Limited,IREN
@@ -178,7 +179,7 @@ def load_portfolio_data():
 백팀,성장자산,금융/자산운용,CME Group Inc.,CME
 백팀,성장자산,금융/자산운용,Bank of New York Mellon,BK
 백팀,성장자산,명품소비재,Ferrari N.V.,RACE
-백팀,성장자산,명품소비재,Williams-Sonoma, Inc.,WSM
+백팀,성장자산,명품소비재,Williams-Sonoma Inc.,WSM
 백팀,성장자산,명품소비재,Tapestry,TPR
 백팀,성장자산,명품소비재,Estée Lauder,EL
 백팀,성장자산,명품소비재,Lululemon Athletica,LULU
