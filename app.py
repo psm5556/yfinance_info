@@ -223,7 +223,7 @@ def load_portfolio_data():
 def get_finviz_metric(ticker: str, metric_name: str):
     """
     Finviz 'snapshot-table2'에서 label 기반으로 재무지표 추출
-    예: metric_name = "Debt/Eq", "Current Ratio", "ROE"
+    예: metric_name = "Debt/Eq", "Current Ratio", "ROE", "Market Cap"
     """
     try:
         url = f"https://finviz.com/quote.ashx?t={ticker}"
@@ -255,6 +255,15 @@ def get_finviz_metric(ticker: str, metric_name: str):
     except Exception as e:
         print(f"[{ticker}] {metric_name} error: {e}")
         return "-"
+
+@st.cache_data(ttl=86400)
+def get_market_cap(ticker: str):
+    """
+    Finviz에서 시가총액 가져오기
+    반환값: 문자열 (예: "150.5B", "1.2T") 또는 "-"
+    """
+    market_cap = get_finviz_metric(ticker, "Market Cap")
+    return market_cap if market_cap != "-" else "-"
 
 # Finviz API에서 재무제표 데이터 가져오기
 @st.cache_data(ttl=86400)
@@ -716,6 +725,9 @@ def main():
                     ticker = row['티커']
                     progress_bar.progress((idx + 1) / len(portfolio_df))
                     stock_data = get_stock_data(ticker, start_date, end_date)
+                    
+                    # 시가총액 가져오기
+                    market_cap = get_market_cap(ticker)
 
                     if stock_data is not None and len(stock_data) > 0:
                         base_price = stock_data['Close'].iloc[0]
@@ -752,6 +764,7 @@ def main():
                             '섹터': row['섹터'],
                             '기업명': row['기업명'],
                             '티커': ticker,
+                            '시가총액': market_cap,
                             '기준가': round(base_price, 2),
                             '최고가': round(highest_price, 2),
                             '현재가': round(current_price, 2),
@@ -776,6 +789,7 @@ def main():
                             '섹터': row['섹터'],
                             '기업명': row['기업명'],
                             '티커': ticker,
+                            '시가총액': market_cap,
                             '기준가': "-",
                             '최고가': "-",
                             '현재가': "-",
@@ -806,7 +820,7 @@ def main():
 
             st.subheader("포트폴리오 상세 분석")
 
-            display_columns = ['팀', '자산', '섹터', '기업명', '티커', '기준가', '최고가', '현재가',
+            display_columns = ['팀', '자산', '섹터', '기업명', '티커', '시가총액', '기준가', '최고가', '현재가',
                                '누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률',
                                '부채비율', '유동비율', 'ROE', 'Runway(년)', 'Total Cash(M$)', 'FCF(M$)']
 
@@ -819,7 +833,7 @@ def main():
             # 표시용 DataFrame 생성
             display_df = st.session_state['result_df'][display_columns].copy()
             
-            # 숫자 컬럼 포맷팅 (소수점 2자리)
+            # 숫자 컬럼 포맷팅 (소수점 2자리) - 시가총액 제외
             float_cols = [
                 '기준가', '최고가', '현재가',
                 '누적수익률(기준가)', '누적수익률(최고가)', '일일수익', '일일수익률',
@@ -875,6 +889,11 @@ def main():
                         "선택",
                         help="차트를 보고 싶은 종목을 선택하세요 (단일 선택)",
                         default=False,
+                    ),
+                    "티커": st.column_config.LinkColumn(
+                        "티커",
+                        help="Finviz 차트 보기",
+                        display_text="https://finviz.com/quote.ashx?t=(.*)&p=d"
                     )
                 },
                 disabled=[col for col in display_df.columns if col not in ['선택']],
